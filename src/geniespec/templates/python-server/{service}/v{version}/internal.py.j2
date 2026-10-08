@@ -22,6 +22,9 @@ class {{ target.internal_class_name(api=api) }}(abc.ABC):
     @abc.abstractmethod
     {% if not target.is_streaming(operation=operation) %}async {% endif %}def {{ target.operation_name(operation=operation) }}_v{{ api.version.major }}(
         self,
+{% if operation.parameters %}
+        *,
+{% endif %}
 {% for parameter in operation.parameters %}
         {{ target.identifier(name=parameter.name) }}: {% if target.is_undefined_parameter(operation=operation, parameter=parameter) %}UpdateValue[{{ target.parameter_type(renderableParameter=parameter, apiVersion=api.version) }}]{% else %}{{ target.parameter_type(renderableParameter=parameter, apiVersion=api.version) }}{% endif %}{% if target.is_undefined_parameter(operation=operation, parameter=parameter) %} = UNDEFINED{% elif parameter.defaultValue is not none %} = {{ target.literal(value=parameter.defaultValue) }}{% endif %},
 {% endfor %}

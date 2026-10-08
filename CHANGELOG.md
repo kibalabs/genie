@@ -13,5 +13,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - [MINOR] Supports resources, nested resources, standard (`LIST`, `GET`, `CREATE`, `UPDATE`, `DELETE`) and custom transitions, root transitions, exceptions, `Json` and `Mapping` types, `accessibleFrom`, request field defaults and bounds, `responseType: stream | redirect` and `source: query-parameters` request fields
 
 ### Changed
+- [MINOR] Generated `python-server` internal methods take their parameters as keyword-only, so type checkers reject implementations that rename a parameter instead of failing at runtime
 
 ### Removed
