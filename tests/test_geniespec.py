@@ -5,7 +5,6 @@ import inspect
 import json
 import pathlib
 import sys
-import tomllib
 import types
 import typing
 
@@ -20,6 +19,7 @@ from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
 from geniespec.cli import build
+from geniespec.cli import watch
 from geniespec.genie import Renderer
 from geniespec.genie import SemanticValidationException
 from geniespec.genie import SyntacticValidationException
@@ -36,15 +36,19 @@ defaultAuthentication: none
 """
 
 
-def _render(specYaml: str, outputDirectory: pathlib.Path) -> list[pathlib.Path]:
-    specPath = outputDirectory / 'api.yaml'
+def _write_spec(specYaml: str, directory: pathlib.Path) -> pathlib.Path:
+    specPath = directory / 'api.yaml'
     specPath.write_text(yaml.safe_dump({**yaml.safe_load(BASE_SPEC), **yaml.safe_load(specYaml)}))
-    return build(specPath=specPath, outputDirectoryPath=outputDirectory / '.genie')
+    return specPath
+
+
+def _render(specYaml: str, outputDirectory: pathlib.Path) -> list[pathlib.Path]:
+    return build(specPath=_write_spec(specYaml=specYaml, directory=outputDirectory), target='python-server', outputDirectoryPath=outputDirectory / 'out')
 
 
 def _generate(specYaml: str, outputDirectory: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _render(specYaml=specYaml, outputDirectory=outputDirectory)
-    monkeypatch.syspath_prepend(str(outputDirectory / '.genie' / 'python' / 'src'))
+    monkeypatch.syspath_prepend(str(outputDirectory / 'out'))
     for moduleName in [name for name in sys.modules if name.split('.')[0] == PACKAGE_NAME]:
         monkeypatch.delitem(sys.modules, moduleName)
 
@@ -536,7 +540,7 @@ transitions:
   - action: RELOAD-ALL-DATA
 """),
     }
-    renderableApi = Renderer().build_renderable_api(api=KibaApi.model_validate(spec))
+    renderableApi = Renderer(target='python-server').build_renderable_api(api=KibaApi.model_validate(spec))
     language = PythonLanguageDefinition()
     names = {f'{language.http_method(operation=operation)} {language.endpoint(operation=operation)}': language.operation_name(operation=operation) for operation in renderableApi.operations}
     assert names == {
@@ -1118,11 +1122,16 @@ def test_rejects_malformed_versions(tmp_path: pathlib.Path) -> None:
         _render(specYaml='version: 1x2x3', outputDirectory=tmp_path)
 
 
-def test_builds_a_typed_package_named_after_the_service(tmp_path: pathlib.Path) -> None:
-    _render(specYaml='transitions: []', outputDirectory=tmp_path)
-    projectDirectory = tmp_path / '.genie' / 'python'
-    assert tomllib.loads((projectDirectory / 'pyproject.toml').read_text())['project']['name'] == 'genie-test-api'
-    assert (projectDirectory / 'src' / PACKAGE_NAME / 'py.typed').is_file()
+def test_builds_only_the_service_package_into_the_output_directory(tmp_path: pathlib.Path) -> None:
+    outputDirectory = tmp_path / 'out'
+    (outputDirectory / 'other_package').mkdir(parents=True)
+    (outputDirectory / 'application.py').write_text('app = None\n')
+    (outputDirectory / 'other_package' / 'module.py').write_text('value = 1\n')
+    changedPaths = _render(specYaml='transitions: []', outputDirectory=tmp_path)
+    assert all(path.relative_to(outputDirectory).parts[0] == PACKAGE_NAME for path in changedPaths)
+    assert (outputDirectory / PACKAGE_NAME / 'v1' / 'api.py').is_file()
+    assert (outputDirectory / 'application.py').read_text() == 'app = None\n'
+    assert (outputDirectory / 'other_package' / 'module.py').read_text() == 'value = 1\n'
 
 
 def test_rebuilds_only_rewrite_changed_files_and_remove_stale_ones(tmp_path: pathlib.Path) -> None:
@@ -1130,7 +1139,7 @@ def test_rebuilds_only_rewrite_changed_files_and_remove_stale_ones(tmp_path: pat
 transitions:
   - action: PING
 """
-    packageDirectory = tmp_path / '.genie' / 'python' / 'src' / PACKAGE_NAME
+    packageDirectory = tmp_path / 'out' / PACKAGE_NAME
     _render(specYaml=specYaml, outputDirectory=tmp_path)
     (packageDirectory / 'stale.py').write_text('')
     (packageDirectory / '__pycache__').mkdir()
@@ -1140,3 +1149,33 @@ transitions:
     assert (packageDirectory / '__pycache__' / 'cached.pyc').exists()
     changedPaths = _render(specYaml=f'{specYaml}  - action: PONG\n', outputDirectory=tmp_path)
     assert set(changedPaths) == {packageDirectory / 'v1' / 'api.py', packageDirectory / 'v1' / 'endpoints.py', packageDirectory / 'v1' / 'internal.py'}
+
+
+REBUILT_EXIT_CODE = 7
+WATCH_COMMAND_SCRIPT = f"""
+import pathlib
+import sys
+import time
+
+import yaml
+
+apiPath = pathlib.Path(sys.argv[1]) / 'genie_test_api' / 'v1' / 'api.py'
+specPath = pathlib.Path(sys.argv[2])
+if 'pong' in apiPath.read_text():
+    sys.exit(2)
+spec = yaml.safe_load(specPath.read_text())
+spec['transitions'].append({{'action': 'PONG'}})
+specPath.write_text(yaml.safe_dump(spec))
+for _ in range(100):
+    if 'pong' in apiPath.read_text():
+        sys.exit({REBUILT_EXIT_CODE})
+    time.sleep(0.1)
+sys.exit(3)
+"""
+
+
+def test_watch_builds_before_running_the_command_rebuilds_while_it_runs_and_returns_its_exit_code(tmp_path: pathlib.Path) -> None:
+    specPath = _write_spec(specYaml='transitions:\n  - action: PING\n', directory=tmp_path)
+    outputDirectory = tmp_path / 'out'
+    returnCode = watch(specPath=specPath, target='python-server', outputDirectoryPath=outputDirectory, command=[sys.executable, '-c', WATCH_COMMAND_SCRIPT, str(outputDirectory), str(specPath)])
+    assert returnCode == REBUILT_EXIT_CODE
