@@ -1,0 +1,50 @@
+name: Build
+on:
+  pull_request:
+    branches: [main]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-pull-request
+  cancel-in-progress: true
+jobs:
+  geniespec-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      checks: write
+    env:
+      DOCKER_IMAGE: build
+    steps:
+      - name: Skip if these files already passed
+        uses: kibalabs/github-action-skip-if-passed@v1
+      - name: Check out the repo
+        if: env.CHECKS_ALREADY_PASSED != 'true'
+        uses: actions/checkout@v7
+      - name: Build docker image
+        if: env.CHECKS_ALREADY_PASSED != 'true'
+        uses: kibalabs/github-action-build-image@v1
+        with:
+          image: geniespec
+          context: .
+          tag: ${{ env.DOCKER_IMAGE }}
+      - name: Run checks
+        uses: kibalabs/github-action-run-docker-checks@v1
+        with:
+          image: ${{ env.DOCKER_IMAGE }}
+          checks: |
+            - name: lint
+              command: make lint-check-ci
+              check-name: geniespec-lint-check
+              annotations-file: lint-check-results.json
+            - name: type-check
+              command: make type-check-ci
+              check-name: geniespec-type-check
+              annotations-file: type-check-results.json
+            - name: security-check
+              command: make security-check-ci
+              check-name: geniespec-security-check
+              annotations-file: security-check-results.json
+            - name: tests
+              command: make test-ci
+              check-name: geniespec-tests
+              annotations-file: test-check-results.json

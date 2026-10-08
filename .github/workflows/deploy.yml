@@ -1,0 +1,20 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy-package-next:
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_IMAGE: package
+      PYPI_PUBLISH_TOKEN: ${{ secrets.PYPI_PUBLISH_TOKEN }}
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7
+        with:
+          # NOTE(krishan711): need full history to calculate difference
+          fetch-depth: 0
+      - name: Build docker image
+        run: docker build --tag $DOCKER_IMAGE .
+      - name: Publish next package to pypi
+        run: docker run -e UV_PUBLISH_TOKEN=$PYPI_PUBLISH_TOKEN $DOCKER_IMAGE /bin/bash -c " make publish-dev"
