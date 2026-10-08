@@ -8,6 +8,7 @@ import sys
 import types
 import typing
 
+import mypy.api
 import pydantic
 import pytest
 import yaml  # type: ignore[import-untyped]
@@ -1179,3 +1180,43 @@ def test_watch_builds_before_running_the_command_rebuilds_while_it_runs_and_retu
     outputDirectory = tmp_path / 'out'
     returnCode = watch(specPath=specPath, target='python-server', outputDirectoryPath=outputDirectory, command=[sys.executable, '-c', WATCH_COMMAND_SCRIPT, str(outputDirectory), str(specPath)])
     assert returnCode == REBUILT_EXIT_CODE
+
+
+INTERNAL_IMPLEMENTATION_TEMPLATE = """
+from genie_test_api.v1 import internal
+from genie_test_api.v1 import resources
+
+
+class Implementation(internal.GenieTestApiV1Internal):
+    async def ping_v1(self) -> None:
+        return None
+
+    async def get_member_v1(self, {parameterName}: str) -> resources.MemberV1:
+        raise NotImplementedError
+"""
+
+
+@pytest.mark.parametrize(('parameterName', 'isValid'), [('memberId', True), ('id', False)])
+def test_type_checkers_reject_implementations_that_rename_parameters(parameterName: str, isValid: bool, tmp_path: pathlib.Path) -> None:
+    _render(
+        specYaml="""
+resources:
+  - singleName: Member
+    collectionName: Members
+    attributes:
+      - name: member-id
+        type: String
+        isPrimary: true
+    transitions:
+      - action: GET
+transitions:
+  - action: PING
+""",
+        outputDirectory=tmp_path,
+    )
+    implementationPath = tmp_path / 'out' / 'implementation.py'
+    implementationPath.write_text(INTERNAL_IMPLEMENTATION_TEMPLATE.format(parameterName=parameterName))
+    report, _, exitStatus = mypy.api.run([str(implementationPath), '--cache-dir', str(tmp_path / 'mypy-cache'), '--no-error-summary'])
+    assert (exitStatus == 0) == isValid, report
+    if not isValid:
+        assert 'Signature of "get_member_v1" incompatible with supertype' in report
