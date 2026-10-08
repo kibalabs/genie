@@ -8,7 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ## [Unreleased]
 
 ### Added
-- [MAJOR] Initial version: `geniespec build --spec api.yaml [--output .genie]` validates an api.yaml spec and writes a python package to `<output>/python` (`pyproject.toml` and `src/<service>_api/v<major>/` with `api`, `endpoints`, `resources`, `internal` and `exceptions`), rewriting only changed files and removing files it no longer generates; `geniespec watch` rebuilds whenever the spec changes and keeps the previous output when the spec is invalid
+- [MAJOR] Initial version: `geniespec build --spec api.yaml --target python-server [--output .]` validates an api.yaml spec and writes the target's package into the output directory (for `python-server`, `<service>_api/v<major>/` with `api`, `endpoints`, `resources`, `internal` and `exceptions`), only touching that package: changed files are rewritten and files it no longer generates are removed
+- [MINOR] Added `geniespec watch`, which rebuilds whenever the spec changes (keeping the previous output when the spec is invalid); given a command after `--` it runs it after the first build, exits with its exit code and stops it when watch is stopped
 - [MINOR] Supports resources, nested resources, standard (`LIST`, `GET`, `CREATE`, `UPDATE`, `DELETE`) and custom transitions, root transitions, exceptions, `Json` and `Mapping` types, `accessibleFrom`, request field defaults and bounds, `responseType: stream | redirect` and `source: query-parameters` request fields
 
 ### Changed

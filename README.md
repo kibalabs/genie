@@ -1,16 +1,16 @@
 # Genie
 
-Genie (`geniespec` on PyPI) generates API code from an `api.yaml` spec. The output is a package you install, not code you commit.
+Genie (`geniespec` on PyPI) generates API code from an `api.yaml` spec. Install it like any other tool and run it from your build scripts; the generated code is gitignored, not committed.
 
 ```
-uvx geniespec build --spec api.yaml [--output .genie]
-uvx geniespec watch --spec api.yaml [--output .genie]
+geniespec build --spec api.yaml --target python-server [--output .]
+geniespec watch --spec api.yaml --target python-server [--output .] [-- <command>]
 ```
 
-- `build` writes `<output>/python`: a project with `pyproject.toml` and `src/<service>_api/v<major>/` (`api`, `endpoints`, `resources`, `internal`, `exceptions`). Only changed files are rewritten and files it no longer generates are removed.
-- `watch` rebuilds whenever the spec changes. If the spec is invalid it logs the error and keeps the previous output.
-- Consumers depend on the output as an editable path dependency, e.g. `my-service-api = { path = ".genie/python", editable = true }` in `[tool.uv.sources]`, and import it as `my_service_api.v1`.
-- Generated code needs `kiba-core` (`core.api`, `core.util.typing_util`), `pydantic` and `starlette` from the consumer.
+- `build` writes the target's package into the output directory, e.g. `./<service>_api/v<major>/` (`api`, `endpoints`, `resources`, `internal`, `exceptions`) for `python-server`. Only files in that package are touched: changed files are rewritten and files it no longer generates are removed.
+- `watch` builds, then rebuilds whenever the spec changes. If the spec is invalid it logs the error and keeps the previous output. Given a command after `--`, it runs it once the first build is done, keeps rebuilding while it runs, exits with its exit code and stops it when watch itself is stopped, e.g. `geniespec watch --spec api.yaml --target python-server -- uvicorn app:app --reload`.
+- Code run from the output directory imports the package directly, e.g. `from my_service_api.v1 import api`. Generated `python-server` code needs `kiba-core` (`core.api`, `core.util.typing_util`), `pydantic` and `starlette`.
+- The bundled templates are examples of a kibalabs-style target.
 
 # Development
 

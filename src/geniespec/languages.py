@@ -75,9 +75,6 @@ class BaseLanguageDefinition:
     def package_name(self, api: RenderableApi) -> str:
         raise NotImplementedError
 
-    def distribution_name(self, api: RenderableApi) -> str:
-        raise NotImplementedError
-
     def validation_errors(self, api: RenderableApi) -> list[str]:
         raise NotImplementedError
 
@@ -213,9 +210,6 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
 
     def package_name(self, api: RenderableApi) -> str:
         return f'{self.snake_name(name=api.serviceName)}_api'
-
-    def distribution_name(self, api: RenderableApi) -> str:
-        return f'{self.kebab_name(name=api.serviceName)}-api'
 
     def internal_class_name(self, api: RenderableApi) -> str:
         return f'{self.pascal_name(name=api.serviceName)}ApiV{api.version.major}Internal'
