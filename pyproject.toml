@@ -1,0 +1,38 @@
+[project]
+name = "geniespec"
+version = "0.1.0"
+description = "Generate API code from an api.yaml spec"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.13, <4"
+dependencies = [
+    "jinja2>=3.1.6",
+    "pyyaml>=6.0.3",
+    "jsonschema>=4.26.0",
+    "pydantic>=2.13.5",
+    "kiba-core>=0.5.3.dev81,<0.5.4",
+]
+
+[project.scripts]
+geniespec = "geniespec.cli:main"
+
+[project.urls]
+repository = "https://github.com/kibalabs/genie"
+
+[dependency-groups]
+dev = [
+    "kiba-build==0.1.11.dev15",
+    "kiba-core[core-api,requester]>=0.5.3.dev81,<0.5.4",
+]
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+# NOTE(krishan711): without this, bumping the version also rewrites dependency pins that contain it (e.g. 0.1.1 inside kiba-build==0.1.11.dev15)
+[tool.bumpversion]
+search = "version = \"{current_version}\""
+replace = "version = \"{new_version}\""
