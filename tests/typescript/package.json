@@ -1,0 +1,10 @@
+{
+  "name": "geniespec-typescript-tests",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@kibalabs/core": "0.7.2-next.1",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}

@@ -5,6 +5,7 @@ install-dependencies:
 install:
 	@ pip install uv
 	@ uv sync --all-extras
+	@ npm ci --prefix tests/typescript
 
 install-updates:
 	@ pip install uv
