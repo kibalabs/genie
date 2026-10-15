@@ -20,6 +20,13 @@ make install
 make lint-check type-check test
 ```
 
+`tests/python_server` covers the core and the `python-server` target (the core tests generate through it) and runs in `Dockerfile`. `tests/typescript_client` covers the `typescript-client` target; it needs node and runs in `typescript-client.Dockerfile`:
+
+```
+make install-typescript-client
+make test-typescript-client
+```
+
 Merges to `main` publish a dev version to PyPI. To release, bump `version` in `pyproject.toml` in a PR, then run the Release workflow on `main` (Actions → Release → Run workflow). It tags `vX.Y.Z` and the Publish workflow publishes it. Only the release workflow can push version tags.
 
 # Things that need work

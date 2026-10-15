@@ -5,7 +5,9 @@ install-dependencies:
 install:
 	@ pip install uv
 	@ uv sync --all-extras
-	@ npm ci --prefix tests/typescript
+
+install-typescript-client:
+	@ npm ci --prefix tests/typescript_client
 
 install-updates:
 	@ pip install uv
@@ -45,10 +47,16 @@ start-prod:
 	@ echo "Not Supported"
 
 test:
-	@ uv run test-check tests
+	@ uv run test-check tests/python_server
 
 test-ci:
-	@ uv run test-check tests --output-file test-check-results.json --output-format annotations
+	@ uv run test-check tests/python_server --output-file test-check-results.json --output-format annotations
+
+test-typescript-client:
+	@ uv run test-check tests/typescript_client
+
+test-typescript-client-ci:
+	@ uv run test-check tests/typescript_client --output-file test-check-results.json --output-format annotations
 
 clean:
 	@ rm -rf ./.mypy_cache ./__pycache__ ./build ./dist
