@@ -14,6 +14,7 @@ from core.exceptions import KibaException
 
 from geniespec.languages import BaseLanguageDefinition
 from geniespec.languages import PythonLanguageDefinition
+from geniespec.languages import TypeScriptLanguageDefinition
 from geniespec.renderable_types import ActionEndpointComponent
 from geniespec.renderable_types import AttributeEndpointComponent
 from geniespec.renderable_types import EndpointContainer
@@ -46,7 +47,7 @@ from geniespec.types import ResponseTypes
 
 SCHEMA_FILE_PATH = pathlib.Path(__file__).parent / 'api_schema.yaml'
 TEMPLATES_DIRECTORY_PATH = pathlib.Path(__file__).parent / 'templates'
-TARGET_LANGUAGE_CODES = {'python-server': 'python'}
+TARGET_LANGUAGE_CODES = {'python-server': 'python', 'typescript-client': 'typescript'}
 
 
 class SyntacticValidationException(BadRequestException):
@@ -72,6 +73,8 @@ class SyntacticApiValidator:
 def get_language_definition(languageCode: str) -> BaseLanguageDefinition:
     if languageCode == 'python':
         return PythonLanguageDefinition()
+    if languageCode == 'typescript':
+        return TypeScriptLanguageDefinition()
     raise KibaException(f'Unrecognized language definition code: {languageCode}')
 
 
