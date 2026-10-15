@@ -1,5 +1,5 @@
 {
-  "name": "geniespec-typescript-tests",
+  "name": "geniespec-typescript-client-tests",
   "private": true,
   "type": "module",
   "devDependencies": {

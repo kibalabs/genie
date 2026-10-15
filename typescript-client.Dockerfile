@@ -12,9 +12,9 @@ COPY pyproject.toml .
 COPY uv.lock .
 RUN make install-dependencies
 
-COPY tests/typescript/package.json tests/typescript/package.json
-COPY tests/typescript/package-lock.json tests/typescript/package-lock.json
-RUN make install-typescript
+COPY tests/typescript_client/package.json tests/typescript_client/package.json
+COPY tests/typescript_client/package-lock.json tests/typescript_client/package-lock.json
+RUN make install-typescript-client
 
 COPY . .
 RUN make install
