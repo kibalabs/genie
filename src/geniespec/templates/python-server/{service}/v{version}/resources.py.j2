@@ -7,7 +7,7 @@ import datetime
 import typing
 {% endif %}
 
-{% if target.resources_require_json(api=api) %}
+{% if target.resources_require_json(api=api) or api.oneOfs %}
 import pydantic
 {% endif %}
 from pydantic import BaseModel
@@ -28,4 +28,10 @@ class {{ target.resource_class_name(resource=resource, apiVersion=api.version) }
     {{ target.identifier(name=attribute.name) }}: {{ target.type(renderableType=attribute.fieldType, apiVersion=api.version, isLocalReference=True) }}
 {% endfor %}
 
+{% endfor %}
+{% for oneOf in api.oneOfs %}
+{% if loop.first %}
+
+{% endif %}
+{{ target.one_of_class_name(oneOf=oneOf, apiVersion=api.version) }} = {{ target.one_of_alias(oneOf=oneOf, apiVersion=api.version) }}
 {% endfor %}

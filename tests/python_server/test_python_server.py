@@ -819,6 +819,72 @@ transitions:
         resources.ViewV1(viewId='v2', kind='other', sizes=[])
 
 
+ONE_OF_SPEC = """
+enums:
+  - name: TableKind
+    values: [table]
+oneOfs:
+  - name: ViewContent
+    discriminator: kind
+    types: [ChartContent, TableContent]
+resources:
+  - singleName: Panel
+    collectionName: Panels
+    attributes:
+      - name: panel-id
+        type: String
+        isPrimary: true
+      - name: contents
+        type: List
+        listValueTypes: [ViewContent]
+      - name: pinned
+        type: ViewContent
+        isNullable: true
+    transitions:
+      - action: GET
+  - singleName: ChartContent
+    collectionName: ChartContents
+    attributes:
+      - name: kind
+        type: Enum
+        enumValues: [chart]
+      - name: points
+        type: List
+        listValueTypes: [Float]
+  - singleName: TableContent
+    collectionName: TableContents
+    attributes:
+      - name: kind
+        type: TableKind
+      - name: rows
+        type: List
+        listValueTypes: [String]
+transitions:
+  - action: RENDER
+    requestFields:
+      - name: content
+        type: ViewContent
+        isRequired: true
+    responseField:
+      name: panel
+      type: Panel
+"""
+
+
+def test_one_of_fields_pick_the_member_named_by_the_discriminator(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _generate(specYaml=ONE_OF_SPEC, outputDirectory=tmp_path, monkeypatch=monkeypatch)
+    resources = _module('resources')
+    panel = resources.PanelV1.model_validate({'panelId': 'p1', 'contents': [{'kind': 'chart', 'points': [1.5]}, {'kind': 'table', 'rows': ['a']}], 'pinned': None})
+    calls: dict[str, dict[str, object]] = {}
+    client = _client(calls=calls, returnValues={'render_v1': panel})
+    response = client.post('/render', json={'content': {'kind': 'table', 'rows': ['x']}})
+    assert [type(content).__name__ for content in panel.contents] == ['ChartContentV1', 'TableContentV1']
+    assert calls['render_v1']['content'] == resources.TableContentV1(kind='table', rows=['x'])
+    assert response.json() == {'panel': {'panelId': 'p1', 'contents': [{'kind': 'chart', 'points': [1.5]}, {'kind': 'table', 'rows': ['a']}], 'pinned': None}}
+    with pytest.raises(BadRequestException, match="content: Input tag 'graph' found using 'kind' does not match any of the expected tags"):
+        client.post('/render', json={'content': {'kind': 'graph', 'rows': []}})
+
+
 def test_file_fields_receive_multipart_uploads_with_their_form_fields(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _generate(
         specYaml="""
@@ -1237,6 +1303,43 @@ transitions:
                 'Attribute image of Scan cannot be a File',
             ],
             id='invalid-file-fields',
+        ),
+        pytest.param(
+            """
+oneOfs:
+  - name: Content
+    discriminator: kind
+    types: [Chart, Table, Graph, Text]
+resources:
+  - singleName: Chart
+    collectionName: Charts
+    attributes:
+      - name: kind
+        type: Enum
+        enumValues: [chart]
+  - singleName: Table
+    collectionName: Tables
+    attributes:
+      - name: kind
+        type: Enum
+        enumValues: [chart]
+  - singleName: Graph
+    collectionName: Graphs
+    attributes:
+      - name: kind
+        type: String
+  - singleName: Text
+    collectionName: Texts
+    attributes:
+      - name: body
+        type: String
+""",
+            [
+                'kind of Graph must be a non-nullable Enum with one value to be part of Content',
+                'Text needs a kind attribute to be part of Content',
+                'Content has more than one kind chart',
+            ],
+            id='invalid-one-of',
         ),
     ],
 )

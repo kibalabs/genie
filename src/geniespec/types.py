@@ -47,6 +47,12 @@ class ApiEnum(BaseModel):
     values: list[str]
 
 
+class ApiOneOf(BaseModel):
+    name: str
+    discriminator: str
+    types: list[str]
+
+
 class Attribute(BaseModel):
     name: str
     fieldType: str = pydantic.Field(alias='type')
@@ -155,6 +161,7 @@ class KibaApi(BaseModel):
     transitions: list[RootTransition] = []
     exceptions: list[ApiException] = []
     enums: list[ApiEnum] = []
+    oneOfs: list[ApiOneOf] = []
     defaultAuthentication: str | None = None
 
     @property

@@ -91,6 +91,7 @@ class RenderableRawTypes:
     CLASS = 'class'
     ENUM = 'enum'
     FILE = 'file'
+    ONE_OF = 'oneOf'
 
 
 class RenderableType(BaseModel):
@@ -104,6 +105,17 @@ class RenderableType(BaseModel):
 class RenderableEnum(BaseModel):
     name: RenderableString
     values: list[str]
+
+
+class RenderableOneOfMember(BaseModel):
+    className: RenderableString
+    value: str
+
+
+class RenderableOneOf(BaseModel):
+    name: RenderableString
+    discriminator: RenderableString
+    members: list[RenderableOneOfMember]
 
 
 class MappingRenderableType(RenderableType):
@@ -238,6 +250,7 @@ class RenderableApi(BaseModel):
     operations: list[RenderableOperation]
     exceptions: list[RenderableException]
     enums: list[RenderableEnum] = []
+    oneOfs: list[RenderableOneOf] = []
 
 
 class ProcessableResource(BaseModel):

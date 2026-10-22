@@ -13,7 +13,7 @@ geniespec watch --spec api.yaml --target <python-server | typescript-client> [--
 - `watch` builds, then rebuilds whenever the spec changes. If the spec is invalid it logs the error and keeps the previous output. Given a command after `--`, it runs it once the first build is done, keeps rebuilding while it runs, exits with its exit code and stops it when watch itself is stopped, e.g. `geniespec watch --spec api.yaml --target python-server -- uvicorn app:app --reload`.
 - The bundled templates are examples of a kibalabs-style target.
 
-## Enums and files
+## Enums, oneOfs and files
 
 Enums are string values limited to a list. Name them at the top level to reuse them, or give a field its own:
 
@@ -36,6 +36,24 @@ resources:
 
 `type: File` request fields upload a file. They are only allowed on POST transitions, and the transition's other fields must be single primitive or enum values, as the request is sent as a multipart form. Internal methods receive kiba-core's `UploadedFile` (`filename`, `contentType`, `content`); clients pass a `File`.
 
+A oneOf is a value that is one of several resources, told apart by a discriminator attribute. Each member resource needs that attribute as a non-nullable enum with a single value:
+
+```yaml
+oneOfs:
+  - name: ViewContent
+    discriminator: kind
+    types: [ChartContent, TableContent]
+resources:
+  - singleName: ChartContent
+    collectionName: ChartContents
+    attributes:
+      - name: kind
+        type: Enum
+        enumValues: [chart]
+```
+
+Fields use it like any other type (`type: ViewContent`, also inside `List` and `Mapping`). `python-server` generates a `ViewContentV1` pydantic discriminated union in `resources`; `typescript-client` generates a `ViewContentV1` union type and a `viewContentV1FromObject` function that builds the member class named by the discriminator (and throws for unknown values).
+
 # Development
 
 ```
@@ -55,8 +73,6 @@ Merges to `main` publish a dev version to PyPI. To release, bump `version` in `p
 # Things that need work
 
 ## Typing of params and fields in general
-
-OneOf not supported yet
 
 I think we need to create an object for Type. what would it look like?
 
