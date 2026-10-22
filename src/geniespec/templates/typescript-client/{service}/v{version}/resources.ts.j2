@@ -47,3 +47,20 @@ export class {{ className }} {
 {% endif %}
 }
 {% endfor %}
+{% for oneOf in api.oneOfs %}
+{% set typeName = target.one_of_class_name(oneOf=oneOf, apiVersion=api.version) %}
+{% set discriminator = target.identifier(name=oneOf.discriminator) %}
+
+export type {{ typeName }} = {{ target.one_of_member_class_names(oneOf=oneOf, apiVersion=api.version) | join(' | ') }};
+
+export const {{ target.one_of_parser_name(name=oneOf.name, apiVersion=api.version) }} = (obj: RawObject): {{ typeName }} => {
+  switch (obj.{{ discriminator }}) {
+{% for member in oneOf.members %}
+    case '{{ member.value }}':
+      return {{ target.one_of_member_class_names(oneOf=oneOf, apiVersion=api.version)[loop.index0] }}.fromObject(obj);
+{% endfor %}
+    default:
+      throw new Error(`Unknown {{ typeName }} {{ discriminator }}: ${String(obj.{{ discriminator }})}`);
+  }
+};
+{% endfor %}

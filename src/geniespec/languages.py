@@ -12,6 +12,7 @@ from geniespec.renderable_types import RenderableEndpointComponent
 from geniespec.renderable_types import RenderableEnum
 from geniespec.renderable_types import RenderableException
 from geniespec.renderable_types import RenderableField
+from geniespec.renderable_types import RenderableOneOf
 from geniespec.renderable_types import RenderableOperation
 from geniespec.renderable_types import RenderableParameter
 from geniespec.renderable_types import RenderableRawTypes
@@ -68,9 +69,6 @@ class BaseLanguageDefinition:
     def object_type(self, isNullable: bool, className: RenderableString, apiVersion: Version, isLocalReference: bool) -> str:
         raise NotImplementedError
 
-    def one_of_type(self, isNullable: bool, subTypes: list[str]) -> str:
-        raise NotImplementedError
-
     def string_type(self, isNullable: bool) -> str:
         raise NotImplementedError
 
@@ -91,10 +89,6 @@ class BaseLanguageDefinition:
 
     def is_valid_name(self, name: str) -> bool:
         raise NotImplementedError
-
-    def _render_one_of_type_string(self, oneOfTypeString: str, isNullable: bool, apiVersion: Version) -> list[str]:
-        oneOfTypes = ''.join(oneOfTypeString.replace('OneOf[', '', 1).rsplit(']', 1)).split(', ')
-        return [self.render_type(renderableType=RenderableType(rawType=oneOfType, isNullable=isNullable), apiVersion=apiVersion) for oneOfType in oneOfTypes]
 
     def _render_list_type_string(self, listTypeString: str, apiVersion: Version) -> str:
         listItemType = ''.join(listTypeString.replace('List[', '', 1).rsplit(']', 1))
@@ -131,7 +125,7 @@ class BaseLanguageDefinition:
             keyType = self.render_type(renderableType=renderableType.keyType, apiVersion=apiVersion, isLocalReference=isLocalReference)
             valueType = self.render_type(renderableType=renderableType.valueType, apiVersion=apiVersion, isLocalReference=isLocalReference)
             return self.mapping_type(isNullable=isNullable, keyType=keyType, valueType=valueType)
-        if yamlType == 'class' and isinstance(renderableType, RenderableType) and renderableType.className is not None:
+        if yamlType in (RenderableRawTypes.CLASS, RenderableRawTypes.ONE_OF) and renderableType.className is not None:
             return self.object_type(isNullable=isNullable, className=renderableType.className, apiVersion=apiVersion, isLocalReference=isLocalReference)
         raise KibaException(f'Failed to render: {type(renderableType)} {renderableType}')
 
@@ -174,6 +168,12 @@ class BaseLanguageDefinition:
 
     def enum_class_name(self, enum: RenderableEnum, apiVersion: Version) -> str:
         return f'{self.pascal_name(name=enum.name)}V{apiVersion.major}'
+
+    def one_of_class_name(self, oneOf: RenderableOneOf, apiVersion: Version) -> str:
+        return f'{self.pascal_name(name=oneOf.name)}V{apiVersion.major}'
+
+    def one_of_member_class_names(self, oneOf: RenderableOneOf, apiVersion: Version) -> list[str]:
+        return [f'{self.pascal_name(name=member.className)}V{apiVersion.major}' for member in oneOf.members]
 
     @staticmethod
     def is_inline_enum(renderableType: RenderableType) -> bool:
@@ -339,10 +339,6 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
         typeName = f'{className.pascalCaseString}V{apiVersion.major}' if isLocalReference else f'resources.{className.pascalCaseString}V{apiVersion.major}'
         return f'{typeName} | None' if isNullable else typeName
 
-    def one_of_type(self, isNullable: bool, subTypes: list[str]) -> str:
-        fieldTypes = ' | '.join(subTypes)
-        return f'{fieldTypes} | None' if isNullable else f'Union[{fieldTypes} | None'
-
     def string_type(self, isNullable: bool) -> str:
         return 'str | None' if isNullable else 'str'
 
@@ -416,7 +412,10 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
         return any(self._contains_json(renderableType=attribute.fieldType) for resource in api.resources for attribute in resource.attributes)
 
     def resources_require_typing(self, api: RenderableApi) -> bool:
-        return len(api.enums) > 0 or any(self.is_inline_enum(renderableType=attribute.fieldType) for resource in api.resources for attribute in resource.attributes)
+        return len(api.enums) > 0 or len(api.oneOfs) > 0 or any(self.is_inline_enum(renderableType=attribute.fieldType) for resource in api.resources for attribute in resource.attributes)
+
+    def one_of_alias(self, oneOf: RenderableOneOf, apiVersion: Version) -> str:
+        return f'typing.Annotated[{" | ".join(self.one_of_member_class_names(oneOf=oneOf, apiVersion=apiVersion))}, pydantic.Field(discriminator={self.identifier(name=oneOf.discriminator)!r})]'
 
     def operations_require_typing(self, api: RenderableApi) -> bool:
         fieldTypes = [parameter.fieldType for operation in api.operations for parameter in operation.parameters] + [field.fieldType for operation in api.operations for field in operation.responseFields or []]
@@ -612,7 +611,10 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
 
     def references_resources(self, renderableTypes: list[RenderableType]) -> bool:
         valueTypes = [self._value_type(renderableType=renderableType) for renderableType in renderableTypes]
-        return any(valueType.rawType in ('class', PrimitiveTypes.JSON) or (valueType.rawType == RenderableRawTypes.ENUM and valueType.className is not None) for valueType in valueTypes)
+        return any(valueType.rawType in ('class', PrimitiveTypes.JSON, RenderableRawTypes.ONE_OF) or (valueType.rawType == RenderableRawTypes.ENUM and valueType.className is not None) for valueType in valueTypes)
+
+    def one_of_parser_name(self, name: RenderableString, apiVersion: Version) -> str:
+        return f'{self._normalized_name(name=name).camelCaseString}V{apiVersion.major}FromObject'
 
     def _value_type(self, renderableType: RenderableType) -> RenderableType:
         return self._value_type(renderableType=renderableType.valueType) if isinstance(renderableType, MappingRenderableType) else renderableType
@@ -658,6 +660,9 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
             valueTypeName = self.type(renderableType=renderableType.valueType, apiVersion=apiVersion, isLocalReference=isLocalReference)
             convertedEntry = self.from_object(renderableType=renderableType.valueType, value='entry', apiVersion=apiVersion, isLocalReference=isLocalReference)
             return f'Object.fromEntries(Object.entries({value} as RawObject).map(([key, entry]: [string, unknown]): [string, {valueTypeName}] => [key, {convertedEntry}]))'
+        if renderableType.rawType == RenderableRawTypes.ONE_OF and renderableType.className is not None:
+            parserName = self.one_of_parser_name(name=renderableType.className, apiVersion=apiVersion)
+            return f'{parserName if isLocalReference else f"Resources.{parserName}"}({value} as RawObject)'
         if renderableType.rawType == 'class' and renderableType.className is not None:
             return f'{self.type(renderableType=renderableType, apiVersion=apiVersion, isLocalReference=isLocalReference)}.fromObject({value} as RawObject)'
         if renderableType.rawType == PrimitiveTypes.STRING:
@@ -677,7 +682,7 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
     def _is_serialized_as_is(self, renderableType: RenderableType) -> bool:
         if isinstance(renderableType, MappingRenderableType):
             return self._is_serialized_as_is(renderableType=renderableType.valueType)
-        return renderableType.rawType not in ('class', PrimitiveTypes.DATE, PrimitiveTypes.DATETIME)
+        return renderableType.rawType not in ('class', RenderableRawTypes.ONE_OF, PrimitiveTypes.DATE, PrimitiveTypes.DATETIME)
 
     def to_object(self, renderableType: RenderableType, value: str, apiVersion: Version, isOptional: bool = False, isLocalReference: bool = False) -> str:
         if self._is_serialized_as_is(renderableType=renderableType):
@@ -693,7 +698,7 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
             valueTypeName = self.type(renderableType=renderableType.valueType, apiVersion=apiVersion, isLocalReference=isLocalReference)
             convertedEntry = self.to_object(renderableType=renderableType.valueType, value='entry', apiVersion=apiVersion, isLocalReference=isLocalReference)
             return f'Object.fromEntries(Object.entries({value}).map(([key, entry]: [string, {valueTypeName}]): [string, unknown] => [key, {convertedEntry}]))'
-        if renderableType.rawType == 'class':
+        if renderableType.rawType in ('class', RenderableRawTypes.ONE_OF):
             return f'{value}.toObject()'
         if renderableType.rawType == PrimitiveTypes.DATETIME:
             return f'dateToString({value})'

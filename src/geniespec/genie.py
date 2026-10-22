@@ -28,6 +28,8 @@ from geniespec.renderable_types import RenderableEnum
 from geniespec.renderable_types import RenderableException
 from geniespec.renderable_types import RenderableField
 from geniespec.renderable_types import RenderableMethod
+from geniespec.renderable_types import RenderableOneOf
+from geniespec.renderable_types import RenderableOneOfMember
 from geniespec.renderable_types import RenderableOperation
 from geniespec.renderable_types import RenderableParameter
 from geniespec.renderable_types import RenderableRawTypes
@@ -36,6 +38,8 @@ from geniespec.renderable_types import RenderableString
 from geniespec.renderable_types import RenderableType
 from geniespec.renderable_types import ResourceEndpointComponent
 from geniespec.renderable_types import SingleResourceEndpointComponent
+from geniespec.types import ApiEnum
+from geniespec.types import ApiOneOf
 from geniespec.types import Attribute
 from geniespec.types import BaseTransition
 from geniespec.types import ComplexTypes
@@ -378,13 +382,44 @@ class Renderer:
         errors += [f'Field {field.name.snakeCaseString} of {exception.name.pascalCaseString} cannot be a File' for exception in exceptions for field in exception.fields if field.fieldType.rawType == RenderableRawTypes.FILE]
         return errors
 
+    @staticmethod
+    def _one_of_members(oneOf: ApiOneOf, resourcesByName: dict[str, Resource], enumsByName: dict[str, ApiEnum]) -> tuple[list[RenderableOneOfMember], list[str]]:
+        members: list[RenderableOneOfMember] = []
+        errors: list[str] = []
+        for typeName in oneOf.types:
+            resource = resourcesByName.get(typeName)
+            if resource is None:
+                errors.append(f'Unknown resource {typeName} in {oneOf.name}')
+                continue
+            attribute = next((attribute for attribute in resource.attributes if attribute.name == oneOf.discriminator), None)
+            if attribute is None:
+                errors.append(f'{typeName} needs a {oneOf.discriminator} attribute to be part of {oneOf.name}')
+                continue
+            values = attribute.enumValues if attribute.fieldType == SpecialTypes.ENUM else enumsByName[attribute.fieldType].values if attribute.fieldType in enumsByName else []
+            if len(values) != 1 or attribute.isNullable:
+                errors.append(f'{oneOf.discriminator} of {typeName} must be a non-nullable Enum with one value to be part of {oneOf.name}')
+                continue
+            members.append(RenderableOneOfMember(className=RenderableString.from_pascal_case_string(string=typeName), value=values[0]))
+        errors += [f'{oneOf.name} has more than one {oneOf.discriminator} {value}' for value, count in collections.Counter(member.value for member in members).items() if count > 1]
+        return members, errors
+
     def build_renderable_api(self, api: KibaApi) -> RenderableApi:
         fullResourceNames = [self._resource_full_name(resource=resource, name=resource.singleName) for resource in api.resources]
         enumNames = [enum.name for enum in api.enums]
-        knownTypeNames = {**dict.fromkeys(fullResourceNames, RenderableRawTypes.CLASS), **dict.fromkeys(enumNames, RenderableRawTypes.ENUM)}
-        resourceErrors = [f'Duplicate type name: {name}' for name, count in collections.Counter(fullResourceNames + enumNames).items() if count > 1]
+        oneOfNames = [oneOf.name for oneOf in api.oneOfs]
+        knownTypeNames = {
+            **dict.fromkeys(fullResourceNames, RenderableRawTypes.CLASS),
+            **dict.fromkeys(enumNames, RenderableRawTypes.ENUM),
+            **dict.fromkeys(oneOfNames, RenderableRawTypes.ONE_OF),
+        }
+        resourceErrors = [f'Duplicate type name: {name}' for name, count in collections.Counter(fullResourceNames + enumNames + oneOfNames).items() if count > 1]
         resourceErrors += [f'Unknown parent resource {resource.parentResource} for {resource.singleName}' for resource in api.resources if resource.parentResource is not None and resource.parentResource not in fullResourceNames]
         resourcesByName = dict(zip(fullResourceNames, api.resources, strict=False))
+        renderableOneOfs: list[RenderableOneOf] = []
+        for oneOf in api.oneOfs:
+            members, oneOfErrors = self._one_of_members(oneOf=oneOf, resourcesByName=resourcesByName, enumsByName={enum.name: enum for enum in api.enums})
+            resourceErrors += oneOfErrors
+            renderableOneOfs.append(RenderableOneOf(name=RenderableString.from_pascal_case_string(string=oneOf.name), discriminator=RenderableString.from_kebab_case_string(string=oneOf.discriminator), members=members))
         for resource, fullName in zip(api.resources, fullResourceNames, strict=True):
             ancestorNames: list[str] = []
             ancestor = resourcesByName.get(resource.parentResource) if resource.parentResource is not None else None
@@ -439,6 +474,7 @@ class Renderer:
             operations=renderableOperations,
             exceptions=renderableExceptions,
             enums=[RenderableEnum(name=RenderableString.from_pascal_case_string(string=enum.name), values=enum.values) for enum in api.enums],
+            oneOfs=renderableOneOfs,
         )
         renderableResources: list[RenderableResource] = [self._resource_to_renderable_resource(resource=resource, knownTypeNames=knownTypeNames) for resource in api.resources]
         uncoveredTransitions: list[str] = []

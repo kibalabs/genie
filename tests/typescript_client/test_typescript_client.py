@@ -281,6 +281,80 @@ def test_typescript_client_types_enums_and_sends_file_fields_as_multipart_forms(
     assert (output['kind'], output['sizes'], output['isUploadedViewParsed']) == ('cycle-start', ['small'], True)
 
 
+ONE_OF_SPEC = """
+oneOfs:
+  - name: ViewContent
+    discriminator: kind
+    types: [ChartContent, TableContent]
+resources:
+  - singleName: Panel
+    collectionName: Panels
+    attributes:
+      - name: panel-id
+        type: String
+        isPrimary: true
+      - name: contents
+        type: List
+        listValueTypes: [ViewContent]
+    transitions:
+      - action: GET
+  - singleName: ChartContent
+    collectionName: ChartContents
+    attributes:
+      - name: kind
+        type: Enum
+        enumValues: [chart]
+      - name: drawn-date
+        type: Datetime
+  - singleName: TableContent
+    collectionName: TableContents
+    attributes:
+      - name: kind
+        type: Enum
+        enumValues: [table]
+transitions:
+  - action: RENDER
+    requestFields:
+      - name: content
+        type: ViewContent
+        isRequired: true
+"""
+ONE_OF_SCRIPT = """
+import { Requester, RestMethod } from '@kibalabs/core';
+
+import { ChartContentV1, GenieTestApiV1Client, TableContentV1, ViewContentV1, viewContentV1FromObject } from './genie-test-api/v1';
+
+const calls: Record<string, unknown>[] = [];
+const requester = {
+  makeRequest: async (method: RestMethod, url: string, data?: Record<string, unknown>): Promise<{ content: string }> => {
+    calls.push({ method, url, data: data ?? null });
+    return { content: JSON.stringify({ panel: { panelId: 'p1', contents: [{ kind: 'chart', drawnDate: '2024-01-02T03:04:05.000Z' }, { kind: 'table' }] } }) };
+  },
+} as unknown as Requester;
+
+const client = new GenieTestApiV1Client(requester, 'https://api.test/v1');
+const panel = await client.getPanel('p1');
+const describe = (content: ViewContentV1): string => (content.kind === 'chart' ? `chart ${content.drawnDate.toISOString()}` : 'table');
+await client.render({ content: new ChartContentV1('chart', new Date('2024-01-02T03:04:05.000Z')) });
+let unknownError = '';
+try {
+  viewContentV1FromObject({ kind: 'graph' });
+} catch (error: unknown) {
+  unknownError = (error as Error).message;
+}
+console.log(JSON.stringify({ calls, described: panel.contents.map(describe), isTable: panel.contents[1] instanceof TableContentV1, unknownError }));
+"""
+
+
+def test_typescript_client_parses_and_sends_one_of_fields_by_discriminator(tmp_path: pathlib.Path) -> None:
+    output = _run_typescript(specYaml=ONE_OF_SPEC, script=ONE_OF_SCRIPT, directory=tmp_path)
+    assert output['described'] == ['chart 2024-01-02T03:04:05.000Z', 'table']
+    assert output['isTable']
+    assert output['calls'][1] == {'method': 'post', 'url': 'https://api.test/v1/render', 'data': {'content': {'kind': 'chart', 'drawnDate': output['calls'][1]['data']['content']['drawnDate']}}}
+    assert _parse_datetime(output['calls'][1]['data']['content']['drawnDate']) == datetime.datetime(2024, 1, 2, 3, 4, 5, tzinfo=datetime.UTC)
+    assert output['unknownError'] == 'Unknown ViewContentV1 kind: graph'
+
+
 def test_typescript_client_rejects_names_reserved_in_typescript(tmp_path: pathlib.Path) -> None:
     specYaml = """
 resources:
