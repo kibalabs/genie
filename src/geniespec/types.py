@@ -35,12 +35,25 @@ class ComplexTypes:
     ALL: ClassVar[list[str]] = [MAPPING]
 
 
+class SpecialTypes:
+    LIST = 'List'
+    ENUM = 'Enum'
+    FILE = 'File'
+    NULL = 'Null'
+
+
+class ApiEnum(BaseModel):
+    name: str
+    values: list[str]
+
+
 class Attribute(BaseModel):
     name: str
     fieldType: str = pydantic.Field(alias='type')
     listValueTypes: list[str] = []
     mappingKeyType: str | None = None
     mappingValueTypes: list[str] = []
+    enumValues: list[str] = []
     isPrimary: bool = False
     isUnique: bool = False
     shouldDisableGetEndpoint: bool = False
@@ -59,6 +72,7 @@ class ResponseField(BaseModel):
     listValueTypes: list[str] = []
     mappingKeyType: str | None = None
     mappingValueTypes: list[str] = []
+    enumValues: list[str] = []
     isNullable: bool = False
     isList: bool = False
 
@@ -69,6 +83,7 @@ class RequestField(BaseModel):
     listValueTypes: list[str] = []
     mappingKeyType: str | None = None
     mappingValueTypes: list[str] = []
+    enumValues: list[str] = []
     isRequired: bool = False
     isDeprecated: bool = False
     defaultValue: str | int | float | bool | None = None
@@ -139,6 +154,7 @@ class KibaApi(BaseModel):
     resources: list[Resource] = []
     transitions: list[RootTransition] = []
     exceptions: list[ApiException] = []
+    enums: list[ApiEnum] = []
     defaultAuthentication: str | None = None
 
     @property

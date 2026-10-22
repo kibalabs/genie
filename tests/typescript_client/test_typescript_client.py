@@ -192,6 +192,95 @@ def test_typescript_client_type_checks_sends_requests_and_parses_responses(tmp_p
     assert set(output['methodNames']) - {'makeRequest', 'makeStreamingRequest'} == {'listPeople', 'createPerson', 'updatePerson', 'deletePerson', 'chatPerson'}
 
 
+ENUM_AND_FILE_SPEC = """
+enums:
+  - name: ViewKind
+    values: [member, cycle-start]
+resources:
+  - singleName: View
+    collectionName: Views
+    attributes:
+      - name: view-id
+        type: String
+        isPrimary: true
+      - name: kind
+        type: ViewKind
+      - name: sizes
+        type: List
+        listValueTypes: [Enum]
+        enumValues: [small, large]
+    transitions:
+      - action: LIST
+transitions:
+  - action: RESIZE
+    requestFields:
+      - name: size
+        type: Enum
+        enumValues: [small, large]
+        isRequired: true
+  - action: UPLOAD-SCAN
+    requestFields:
+      - name: file
+        type: File
+        isRequired: true
+      - name: taken-date
+        type: Date
+      - name: kind
+        type: ViewKind
+      - name: note
+        type: String
+    responseField:
+      name: view
+      type: View
+"""
+ENUM_AND_FILE_SCRIPT = """
+import { Requester, RestMethod } from '@kibalabs/core';
+
+import { GenieTestApiV1Client, ViewKindV1, ViewV1 } from './genie-test-api/v1';
+
+const viewObject = { viewId: 'v1', kind: 'cycle-start', sizes: ['small'] };
+const calls: Record<string, unknown>[] = [];
+const requester = {
+  makeRequest: async (method: RestMethod, url: string, data?: Record<string, unknown>): Promise<{ content: string }> => {
+    calls.push({ method, url, data: data ?? null });
+    return { content: JSON.stringify(method === RestMethod.GET ? { views: [viewObject] } : {}) };
+  },
+  makeFormRequest: async (url: string, formData: FormData): Promise<{ content: string }> => {
+    const form: Record<string, unknown> = {};
+    for (const [key, value] of formData.entries()) {
+      form[key] = typeof value === 'string' ? value : { name: value.name, type: value.type, text: await value.text() };
+    }
+    calls.push({ method: 'form', url, form });
+    return { content: JSON.stringify({ view: viewObject }) };
+  },
+} as unknown as Requester;
+
+const client = new GenieTestApiV1Client(requester, 'https://api.test/v1');
+const views = await client.listViews();
+const kind: ViewKindV1 = views[0].kind;
+await client.resize({ size: 'large' });
+// @ts-expect-error sizes are limited to the enum values
+await client.resize({ size: 'huge' });
+const uploadedView = await client.uploadScan({ file: new File(['scan-content'], 'scan.dcm', { type: 'application/dicom' }), takenDate: new Date(Date.UTC(2024, 0, 2)), kind: 'member' });
+console.log(JSON.stringify({ calls, kind, sizes: views[0].sizes, isUploadedViewParsed: uploadedView instanceof ViewV1 }));
+"""
+
+
+def test_typescript_client_types_enums_and_sends_file_fields_as_multipart_forms(tmp_path: pathlib.Path) -> None:
+    output = _run_typescript(specYaml=ENUM_AND_FILE_SPEC, script=ENUM_AND_FILE_SCRIPT, directory=tmp_path)
+    assert output['calls'] == [
+        {'method': 'get', 'url': 'https://api.test/v1/views', 'data': None},
+        {'method': 'post', 'url': 'https://api.test/v1/resize', 'data': {'size': 'large'}},
+        {'method': 'post', 'url': 'https://api.test/v1/resize', 'data': {'size': 'huge'}},
+        {
+            'method': 'form',
+            'url': 'https://api.test/v1/upload-scan',
+            'form': {'file': {'name': 'scan.dcm', 'type': 'application/dicom', 'text': 'scan-content'}, 'takenDate': '2024-01-02', 'kind': 'member'},
+        },
+    ]
+    assert (output['kind'], output['sizes'], output['isUploadedViewParsed']) == ('cycle-start', ['small'], True)
+
+
 def test_typescript_client_rejects_names_reserved_in_typescript(tmp_path: pathlib.Path) -> None:
     specYaml = """
 resources:

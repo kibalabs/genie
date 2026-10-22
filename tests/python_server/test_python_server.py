@@ -766,6 +766,91 @@ exceptions:
     assert (roundTrippedException.limit, roundTrippedException.message) == (3, 'too many')
 
 
+def test_enums_constrain_resources_requests_and_responses(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _generate(
+        specYaml="""
+enums:
+  - name: ViewKind
+    values: [member, cycle-start]
+resources:
+  - singleName: View
+    collectionName: Views
+    attributes:
+      - name: view-id
+        type: String
+        isPrimary: true
+      - name: kind
+        type: ViewKind
+      - name: sizes
+        type: List
+        listValueTypes: [Enum]
+        enumValues: [small, large]
+    transitions:
+      - action: LIST
+        requestFields:
+          - name: kind
+            type: ViewKind
+transitions:
+  - action: RESIZE
+    requestFields:
+      - name: size
+        type: Enum
+        enumValues: [small, large]
+        isRequired: true
+    responseField:
+      name: kind
+      type: ViewKind
+""",
+        outputDirectory=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    resources = _module('resources')
+    view = resources.ViewV1(viewId='v1', kind='cycle-start', sizes=['small'])
+    calls: dict[str, dict[str, object]] = {}
+    client = _client(calls=calls, returnValues={'list_views_v1': [view], 'resize_v1': 'member'})
+    listResponse = client.get('/views', params={'kind': 'cycle-start'})
+    resizeResponse = client.post('/resize', json={'size': 'large'})
+    assert listResponse.json() == {'views': [{'viewId': 'v1', 'kind': 'cycle-start', 'sizes': ['small']}]}
+    assert resizeResponse.json() == {'kind': 'member'}
+    assert calls == {'list_views_v1': {'kind': 'cycle-start'}, 'resize_v1': {'size': 'large'}}
+    with pytest.raises(BadRequestException, match="size: Input should be 'small' or 'large'"):
+        client.post('/resize', json={'size': 'huge'})
+    with pytest.raises(pydantic.ValidationError):
+        resources.ViewV1(viewId='v2', kind='other', sizes=[])
+
+
+def test_file_fields_receive_multipart_uploads_with_their_form_fields(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _generate(
+        specYaml="""
+transitions:
+  - action: UPLOAD-SCAN
+    requestFields:
+      - name: file
+        type: File
+        isRequired: true
+      - name: page-count
+        type: Integer
+      - name: quality
+        type: Enum
+        enumValues: [low, high]
+    responseField:
+      name: size
+      type: Integer
+""",
+        outputDirectory=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    calls: dict[str, dict[str, object]] = {}
+    client = _client(calls=calls, returnValues={'upload_scan_v1': 12})
+    response = client.post('/upload-scan', files={'file': ('scan.dcm', b'scan-content', 'application/dicom')}, data={'pageCount': '3', 'quality': 'high'})
+    assert response.json() == {'size': 12}
+    uploadedFile = calls['upload_scan_v1']['file']
+    assert (uploadedFile.filename, uploadedFile.contentType, uploadedFile.content) == ('scan.dcm', 'application/dicom', b'scan-content')  # type: ignore[attr-defined]
+    assert (calls['upload_scan_v1']['pageCount'], calls['upload_scan_v1']['quality']) == (3, 'high')
+    with pytest.raises(BadRequestException, match='file: Field required'):
+        client.post('/upload-scan', files={'other': ('other.txt', b'other', 'text/plain')}, data={'pageCount': '3'})
+
+
 @pytest.mark.parametrize(
     ('specYaml', 'expectedErrors'),
     [
@@ -910,7 +995,7 @@ resources:
         type: String
         isPrimary: true
 """,
-            ['Duplicate resource name: MemberNote', 'Unknown parent resource Note for Reply'],
+            ['Duplicate type name: MemberNote', 'Unknown parent resource Note for Reply'],
             id='child-resource-naming',
         ),
         pytest.param(
@@ -1096,6 +1181,62 @@ transitions:
                 'webhook: query-parameters field params must be a Mapping of String to String',
             ],
             id='invalid-sources-and-response-types',
+        ),
+        pytest.param(
+            """
+enums:
+  - name: Note
+    values: [a]
+resources:
+  - singleName: Note
+    collectionName: Notes
+    attributes:
+      - name: note-id
+        type: String
+        isPrimary: true
+""",
+            ['Duplicate type name: Note'],
+            id='duplicate-enum-name',
+        ),
+        pytest.param(
+            """
+resources:
+  - singleName: Scan
+    collectionName: Scans
+    attributes:
+      - name: scan-id
+        type: String
+        isPrimary: true
+      - name: image
+        type: File
+    transitions:
+      - action: GET
+      - action: LIST
+        requestFields:
+          - name: image
+            type: File
+transitions:
+  - action: UPLOAD
+    requestFields:
+      - name: images
+        type: List
+        listValueTypes: [File]
+      - name: tags
+        type: List
+        listValueTypes: [String]
+  - action: DOWNLOAD
+    responseField:
+      name: image
+      type: File
+""",
+            [
+                'GET: only POST transitions can have File fields',
+                'upload: field images cannot be sent with File fields',
+                'upload: field tags cannot be sent with File fields',
+                'download: response field image cannot be a File',
+                'Attribute image of Scan cannot be a File',
+            ],
+            id='invalid-file-fields',
         ),
     ],
 )

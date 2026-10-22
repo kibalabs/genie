@@ -32,6 +32,10 @@ properties:
     type: array
     items:
       $ref: '#/definitions/Exception'
+  enums:
+    type: array
+    items:
+      $ref: '#/definitions/Enum'
   imports:
     type: array
     items:
@@ -42,6 +46,25 @@ properties:
       - string
     pattern: '^[a-z][a-z0-9-]*$'
 definitions:
+  EnumValues:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      pattern: '^[A-Za-z0-9][A-Za-z0-9_-]*$'
+  Enum:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - values
+    properties:
+      name:
+        type: string
+        pattern: '^[A-Z][A-Za-z]*$'
+      values:
+        $ref: '#/definitions/EnumValues'
   Attribute:
     type: object
     additionalProperties: false
@@ -93,6 +116,8 @@ definitions:
         items:
           type: string
           pattern: '^[A-Z][A-Za-z-\[\]_, ]*$'
+      enumValues:
+        $ref: '#/definitions/EnumValues'
   Resource:
     type: object
     additionalProperties: false
@@ -221,6 +246,8 @@ definitions:
         items:
           type: string
           pattern: '^[A-Z][A-Za-z-\[\]_, ]*$'
+      enumValues:
+        $ref: '#/definitions/EnumValues'
       isRequired:
         type: boolean
       defaultValue:
@@ -271,6 +298,8 @@ definitions:
         items:
           type: string
           pattern: '^[A-Z][A-Za-z-\[\]_, ]*$'
+      enumValues:
+        $ref: '#/definitions/EnumValues'
       isNullable:
         type: boolean
       isList:

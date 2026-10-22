@@ -24,11 +24,13 @@ from geniespec.renderable_types import ProcessableResource
 from geniespec.renderable_types import RenderableApi
 from geniespec.renderable_types import RenderableAttribute
 from geniespec.renderable_types import RenderableEndpoint
+from geniespec.renderable_types import RenderableEnum
 from geniespec.renderable_types import RenderableException
 from geniespec.renderable_types import RenderableField
 from geniespec.renderable_types import RenderableMethod
 from geniespec.renderable_types import RenderableOperation
 from geniespec.renderable_types import RenderableParameter
+from geniespec.renderable_types import RenderableRawTypes
 from geniespec.renderable_types import RenderableResource
 from geniespec.renderable_types import RenderableString
 from geniespec.renderable_types import RenderableType
@@ -44,10 +46,12 @@ from geniespec.types import RequestField
 from geniespec.types import Resource
 from geniespec.types import ResponseField
 from geniespec.types import ResponseTypes
+from geniespec.types import SpecialTypes
 
 SCHEMA_FILE_PATH = pathlib.Path(__file__).parent / 'api_schema.yaml'
 TEMPLATES_DIRECTORY_PATH = pathlib.Path(__file__).parent / 'templates'
 TARGET_LANGUAGE_CODES = {'python-server': 'python', 'typescript-client': 'typescript'}
+FORM_FIELD_RAW_TYPES = frozenset({*PrimitiveTypes.ALL, RenderableRawTypes.ENUM, RenderableRawTypes.FILE} - {PrimitiveTypes.JSON})
 
 
 class SyntacticValidationException(BadRequestException):
@@ -106,7 +110,7 @@ class Renderer:
         method = transition.method or defaultMethods.get(transition.action.upper(), 'POST')
         return RenderableMethod(method=RenderableString.from_upper_case_string(string=method))
 
-    def _action_operation(self, transition: BaseTransition, endpoint: RenderableEndpoint, knownTypeNames: set[str], defaultAuthentication: str | None, isIndirectAction: bool = False) -> RenderableOperation:
+    def _action_operation(self, transition: BaseTransition, endpoint: RenderableEndpoint, knownTypeNames: dict[str, str], defaultAuthentication: str | None, isIndirectAction: bool = False) -> RenderableOperation:
         method = self._transition_to_renderable_method(transition=transition)
         fields = [self._request_field_to_renderable_parameter(requestField=requestField, knownTypeNames=knownTypeNames) for requestField in transition.requestFields]
         isQuery = method.method.upperCaseString == 'GET'
@@ -126,38 +130,50 @@ class Renderer:
         rawType: str,
         isNullable: bool,
         isList: bool,
-        knownTypeNames: set[str],
+        knownTypeNames: dict[str, str],
         listValueTypes: list[str] | None = None,
         mappingKeyType: str | None = None,
         mappingValueTypes: list[str] | None = None,
+        enumValues: list[str] | None = None,
     ) -> RenderableType:
         listValueTypes = listValueTypes or []
         mappingValueTypes = mappingValueTypes or []
+        enumValues = enumValues or []
         if rawType == ComplexTypes.MAPPING:
             if mappingKeyType is None or len(mappingValueTypes) == 0:
                 raise KibaException(message='Mapping types require mappingKeyType and mappingValueTypes')
+            if enumValues:
+                raise KibaException(message='Mapping types cannot define enumValues, use a named enum as the value type')
             keyType = self._type_to_renderable_type(rawType=mappingKeyType, isNullable=False, isList=False, knownTypeNames=knownTypeNames)
-            nonNullValueTypes = [valueType for valueType in mappingValueTypes if valueType != 'Null']
+            nonNullValueTypes = [valueType for valueType in mappingValueTypes if valueType != SpecialTypes.NULL]
             if len(nonNullValueTypes) != 1 or len(nonNullValueTypes) - len(mappingValueTypes) not in (0, -1):
                 raise KibaException(message=f'Mapping types currently support one value type with an optional Null: {mappingValueTypes}')
-            valueType = self._type_to_renderable_type(rawType=nonNullValueTypes[0], isNullable='Null' in mappingValueTypes, isList=False, knownTypeNames=knownTypeNames)
+            valueType = self._type_to_renderable_type(rawType=nonNullValueTypes[0], isNullable=SpecialTypes.NULL in mappingValueTypes, isList=False, knownTypeNames=knownTypeNames)
             return MappingRenderableType(isNullable=isNullable, isList=isList, keyType=keyType, valueType=valueType)
-        if rawType == 'List':
+        if rawType == SpecialTypes.LIST:
             if isList or len(listValueTypes) != 1:
                 raise KibaException(message='List types require exactly one listValueTypes entry')
-            itemType = self._type_to_renderable_type(rawType=listValueTypes[0], isNullable=False, isList=False, knownTypeNames=knownTypeNames)
+            itemType = self._type_to_renderable_type(rawType=listValueTypes[0], isNullable=False, isList=False, knownTypeNames=knownTypeNames, enumValues=enumValues)
             if itemType.isList:
                 raise KibaException(message='Nested list types are not supported')
-            return RenderableType(rawType=itemType.rawType, isNullable=isNullable, isList=True, className=itemType.className)
+            return itemType.model_copy(update={'isNullable': isNullable, 'isList': True})
         if listValueTypes:
             raise KibaException(message=f'Only List types may define listValueTypes: {rawType}')
+        if rawType == SpecialTypes.ENUM:
+            if not enumValues:
+                raise KibaException(message='Enum types require enumValues')
+            return RenderableType(rawType=RenderableRawTypes.ENUM, isNullable=isNullable, isList=isList, enumValues=enumValues)
+        if enumValues:
+            raise KibaException(message=f'Only Enum types may define enumValues: {rawType}')
+        if rawType == SpecialTypes.FILE:
+            return RenderableType(rawType=RenderableRawTypes.FILE, isNullable=isNullable, isList=isList)
         if rawType in PrimitiveTypes.ALL:
             return RenderableType(rawType=rawType, isNullable=isNullable, isList=isList)
         if rawType in knownTypeNames:
-            return RenderableType(rawType='class', isNullable=isNullable, className=RenderableString.from_pascal_case_string(string=rawType), isList=isList)
+            return RenderableType(rawType=knownTypeNames[rawType], isNullable=isNullable, className=RenderableString.from_pascal_case_string(string=rawType), isList=isList)
         raise KibaException(message=f'Unknown type: {rawType}')
 
-    def _request_field_to_renderable_parameter(self, requestField: RequestField, knownTypeNames: set[str]) -> RenderableParameter:
+    def _request_field_to_renderable_parameter(self, requestField: RequestField, knownTypeNames: dict[str, str]) -> RenderableParameter:
         return RenderableParameter(
             name=RenderableString.from_kebab_case_string(string=requestField.name),
             fieldType=self._type_to_renderable_type(
@@ -168,6 +184,7 @@ class Renderer:
                 listValueTypes=requestField.listValueTypes,
                 mappingKeyType=requestField.mappingKeyType,
                 mappingValueTypes=requestField.mappingValueTypes,
+                enumValues=requestField.enumValues,
             ),
             defaultValue=requestField.defaultValue,
             maxValue=requestField.maxValue,
@@ -177,7 +194,7 @@ class Renderer:
             source=requestField.source,
         )
 
-    def _response_field_to_renderable_field(self, responseField: ResponseField, knownTypeNames: set[str]) -> RenderableField:
+    def _response_field_to_renderable_field(self, responseField: ResponseField, knownTypeNames: dict[str, str]) -> RenderableField:
         return RenderableField(
             name=RenderableString.from_kebab_case_string(string=responseField.name),
             fieldType=self._type_to_renderable_type(
@@ -188,10 +205,11 @@ class Renderer:
                 listValueTypes=responseField.listValueTypes,
                 mappingKeyType=responseField.mappingKeyType,
                 mappingValueTypes=responseField.mappingValueTypes,
+                enumValues=responseField.enumValues,
             ),
         )
 
-    def _attribute_to_renderable_attribute(self, attribute: Attribute, knownTypeNames: set[str], isNullable: bool | None = None) -> RenderableAttribute:
+    def _attribute_to_renderable_attribute(self, attribute: Attribute, knownTypeNames: dict[str, str], isNullable: bool | None = None) -> RenderableAttribute:
         return RenderableAttribute(
             name=RenderableString.from_kebab_case_string(string=attribute.name),
             fieldType=self._type_to_renderable_type(
@@ -202,6 +220,7 @@ class Renderer:
                 listValueTypes=attribute.listValueTypes,
                 mappingKeyType=attribute.mappingKeyType,
                 mappingValueTypes=attribute.mappingValueTypes,
+                enumValues=attribute.enumValues,
             ),
             defaultValue=attribute.defaultValue,
             isUnique=attribute.isUnique,
@@ -212,11 +231,18 @@ class Renderer:
             isNullable=attribute.isNullable,
         )
 
-    def _attribute_to_renderable_parameter(self, attribute: Attribute, isRequired: bool, knownTypeNames: set[str], shouldUseDefault: bool = True) -> RenderableParameter:
+    def _attribute_to_renderable_parameter(self, attribute: Attribute, isRequired: bool, knownTypeNames: dict[str, str], shouldUseDefault: bool = True) -> RenderableParameter:
         return RenderableParameter(
             name=RenderableString.from_kebab_case_string(string=attribute.name),
             fieldType=self._type_to_renderable_type(
-                rawType=attribute.fieldType, isNullable=attribute.isNullable, isList=False, knownTypeNames=knownTypeNames, listValueTypes=attribute.listValueTypes, mappingKeyType=attribute.mappingKeyType, mappingValueTypes=attribute.mappingValueTypes
+                rawType=attribute.fieldType,
+                isNullable=attribute.isNullable,
+                isList=False,
+                knownTypeNames=knownTypeNames,
+                listValueTypes=attribute.listValueTypes,
+                mappingKeyType=attribute.mappingKeyType,
+                mappingValueTypes=attribute.mappingValueTypes,
+                enumValues=attribute.enumValues,
             ),
             defaultValue=attribute.defaultValue if shouldUseDefault else None,
             isRequired=isRequired,
@@ -227,7 +253,7 @@ class Renderer:
     def _resource_full_name(resource: Resource, name: str) -> str:
         return f'{resource.parentResource or ""}{name}'
 
-    def _resource_to_renderable_resource(self, resource: Resource, knownTypeNames: set[str]) -> RenderableResource:
+    def _resource_to_renderable_resource(self, resource: Resource, knownTypeNames: dict[str, str]) -> RenderableResource:
         attributes = [self._attribute_to_renderable_attribute(attribute=attribute, knownTypeNames=knownTypeNames) for attribute in resource.attributes]
         return RenderableResource(
             singleName=RenderableString.from_pascal_case_string(string=self._resource_full_name(resource=resource, name=resource.singleName)),
@@ -239,7 +265,7 @@ class Renderer:
             accessibleFrom=resource.accessibleFrom,
         )
 
-    def _get_processable_resource(self, renderableResource: RenderableResource, allResources: list[RenderableResource], knownTypeNames: set[str]) -> ProcessableResource:
+    def _get_processable_resource(self, renderableResource: RenderableResource, allResources: list[RenderableResource], knownTypeNames: dict[str, str]) -> ProcessableResource:
         parent: ProcessableResource.Parent | None = None
         attributeOccurrences: list[ProcessableResource.IndependentAttributeOccurrence] = []
         parentResource = next(iter([otherResource for otherResource in allResources if renderableResource.parentResource and otherResource.singleName.pascalCaseString == renderableResource.parentResource]), None)
@@ -249,7 +275,7 @@ class Renderer:
             parent = ProcessableResource.Parent(processableResource=parentProcessableResource, isOneToOne=isOneToOne)
         for otherResource in allResources:
             for attribute in otherResource.independentAttributes:
-                if attribute.fieldType.rawType == 'class' and attribute.fieldType.className == renderableResource.singleName:
+                if attribute.fieldType.rawType == RenderableRawTypes.CLASS and attribute.fieldType.className == renderableResource.singleName:
                     occursInResource = self._get_processable_resource(renderableResource=otherResource, allResources=allResources, knownTypeNames=knownTypeNames)
                     occursInAttribute = attribute
                     attributeOccurrences.append(ProcessableResource.IndependentAttributeOccurrence(processableResource=occursInResource, attribute=occursInAttribute))
@@ -328,13 +354,36 @@ class Renderer:
             errors.append(f'{name}: stream transitions need a responseField')
         if operation.responseType == ResponseTypes.REDIRECT and operation.responseFields:
             errors.append(f'{name}: redirect transitions cannot have a responseField')
+        errors += [f'{name}: response field {field.name.kebabCaseString} cannot be a File' for field in operation.responseFields or [] if field.fieldType.rawType == RenderableRawTypes.FILE]
+        if any(parameter.fieldType.rawType == RenderableRawTypes.FILE for parameter in operation.parameters):
+            if operation.method.method.upperCaseString != 'POST':
+                errors.append(f'{name}: only POST transitions can have File fields')
+            if operation.responseType == ResponseTypes.STREAM:
+                errors.append(f'{name}: stream transitions cannot have File fields')
+            errors += [
+                f'{name}: field {parameter.name.kebabCaseString} cannot be sent with File fields, only single primitive, enum and File values can'
+                for parameter in operation.parameters
+                if parameter.source == FieldSources.REQUEST and (parameter.fieldType.isList or isinstance(parameter.fieldType, MappingRenderableType) or parameter.fieldType.rawType not in FORM_FIELD_RAW_TYPES)
+            ]
+        return errors
+
+    @staticmethod
+    def _file_errors(resources: list[RenderableResource], exceptions: list[RenderableException]) -> list[str]:
+        errors = [
+            f'Attribute {attribute.name.kebabCaseString} of {resource.singleName.pascalCaseString} cannot be a File'
+            for resource in resources
+            for attribute in [*resource.attributes, *resource.independentAttributes]
+            if attribute.fieldType.rawType == RenderableRawTypes.FILE
+        ]
+        errors += [f'Field {field.name.snakeCaseString} of {exception.name.pascalCaseString} cannot be a File' for exception in exceptions for field in exception.fields if field.fieldType.rawType == RenderableRawTypes.FILE]
         return errors
 
     def build_renderable_api(self, api: KibaApi) -> RenderableApi:
         fullResourceNames = [self._resource_full_name(resource=resource, name=resource.singleName) for resource in api.resources]
-        knownTypeNames = set(fullResourceNames)
-        resourceErrors = [f'Duplicate resource name: {name}' for name, count in collections.Counter(fullResourceNames).items() if count > 1]
-        resourceErrors += [f'Unknown parent resource {resource.parentResource} for {resource.singleName}' for resource in api.resources if resource.parentResource is not None and resource.parentResource not in knownTypeNames]
+        enumNames = [enum.name for enum in api.enums]
+        knownTypeNames = {**dict.fromkeys(fullResourceNames, RenderableRawTypes.CLASS), **dict.fromkeys(enumNames, RenderableRawTypes.ENUM)}
+        resourceErrors = [f'Duplicate type name: {name}' for name, count in collections.Counter(fullResourceNames + enumNames).items() if count > 1]
+        resourceErrors += [f'Unknown parent resource {resource.parentResource} for {resource.singleName}' for resource in api.resources if resource.parentResource is not None and resource.parentResource not in fullResourceNames]
         resourcesByName = dict(zip(fullResourceNames, api.resources, strict=False))
         for resource, fullName in zip(api.resources, fullResourceNames, strict=True):
             ancestorNames: list[str] = []
@@ -389,6 +438,7 @@ class Renderer:
             resources=[],
             operations=renderableOperations,
             exceptions=renderableExceptions,
+            enums=[RenderableEnum(name=RenderableString.from_pascal_case_string(string=enum.name), values=enum.values) for enum in api.enums],
         )
         renderableResources: list[RenderableResource] = [self._resource_to_renderable_resource(resource=resource, knownTypeNames=knownTypeNames) for resource in api.resources]
         uncoveredTransitions: list[str] = []
@@ -466,6 +516,7 @@ class Renderer:
                 message=f'Transitions with no endpoint: {", ".join(uncoveredTransitions)}. Item transitions need a primary attribute, collection transitions need direct access or a parent resource, and CREATE is not supported on one-to-one child resources.'
             )
         operationErrors = [error for operation in renderableApi.operations for error in self._operation_errors(operation=operation)]
+        operationErrors += self._file_errors(resources=renderableResources, exceptions=renderableExceptions)
         if operationErrors:
             raise SemanticValidationException(message='\n'.join(operationErrors))
         renderableApi.resources.extend(renderableResources)

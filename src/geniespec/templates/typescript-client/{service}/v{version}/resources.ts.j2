@@ -6,6 +6,10 @@ import { RawObject } from '@kibalabs/core';
 {% endif %}
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+{% for enum in api.enums %}
+
+export type {{ target.enum_class_name(enum=enum, apiVersion=api.version) }} = {{ target.enum_union(values=enum.values) }};
+{% endfor %}
 {% for resource in api.resources %}
 {% set className = target.resource_class_name(resource=resource, apiVersion=api.version) %}
 

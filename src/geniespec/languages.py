@@ -9,10 +9,12 @@ from geniespec.renderable_types import AttributeEndpointComponent
 from geniespec.renderable_types import MappingRenderableType
 from geniespec.renderable_types import RenderableApi
 from geniespec.renderable_types import RenderableEndpointComponent
+from geniespec.renderable_types import RenderableEnum
 from geniespec.renderable_types import RenderableException
 from geniespec.renderable_types import RenderableField
 from geniespec.renderable_types import RenderableOperation
 from geniespec.renderable_types import RenderableParameter
+from geniespec.renderable_types import RenderableRawTypes
 from geniespec.renderable_types import RenderableResource
 from geniespec.renderable_types import RenderableString
 from geniespec.renderable_types import RenderableType
@@ -72,7 +74,10 @@ class BaseLanguageDefinition:
     def string_type(self, isNullable: bool) -> str:
         raise NotImplementedError
 
-    def enum_type(self, isNullable: bool, values: list[str]) -> str:
+    def enum_type(self, isNullable: bool, renderableType: RenderableType, apiVersion: Version, isLocalReference: bool) -> str:
+        raise NotImplementedError
+
+    def file_type(self, isNullable: bool) -> str:
         raise NotImplementedError
 
     def package_name(self, api: RenderableApi) -> str:
@@ -118,14 +123,10 @@ class BaseLanguageDefinition:
             return self.date_type(isNullable=isNullable)
         if yamlType == PrimitiveTypes.JSON:
             return self.json_type(isNullable=isNullable)
-        # if yamlType == PrimitiveTypes.STRUCT:
-        #     return self.struct_type(isNullable=isNullable)
-        # if yamlType.startswith(PrimitiveTypes.ENUM):
-        #     values = ''.join(yamlType.replace('Enum[', '', 1).rsplit(']', 1)).split(', ')
-        #     return self.enum_type(isNullable=isNullable, values=[RenderableString.from_kebab_case_string(string=value) for value in values])
-        # if yamlType.startswith(PrimitiveTypes.ONE_OF):
-        #     subTypes = self._render_one_of_type_string(oneOfTypeString=yamlType, isNullable=isNullable, apiVersion=apiVersion)
-        #     return self.one_of_type(isNullable=isNullable, subTypes=subTypes)
+        if yamlType == RenderableRawTypes.ENUM:
+            return self.enum_type(isNullable=isNullable, renderableType=renderableType, apiVersion=apiVersion, isLocalReference=isLocalReference)
+        if yamlType == RenderableRawTypes.FILE:
+            return self.file_type(isNullable=isNullable)
         if yamlType == ComplexTypes.MAPPING and isinstance(renderableType, MappingRenderableType):
             keyType = self.render_type(renderableType=renderableType.keyType, apiVersion=apiVersion, isLocalReference=isLocalReference)
             valueType = self.render_type(renderableType=renderableType.valueType, apiVersion=apiVersion, isLocalReference=isLocalReference)
@@ -170,6 +171,17 @@ class BaseLanguageDefinition:
 
     def exception_class_name(self, exception: RenderableException, apiVersion: Version) -> str:
         return f'{self.pascal_name(name=exception.name)}V{apiVersion.major}'
+
+    def enum_class_name(self, enum: RenderableEnum, apiVersion: Version) -> str:
+        return f'{self.pascal_name(name=enum.name)}V{apiVersion.major}'
+
+    @staticmethod
+    def is_inline_enum(renderableType: RenderableType) -> bool:
+        return renderableType.rawType == RenderableRawTypes.ENUM and renderableType.className is None
+
+    @staticmethod
+    def is_file_operation(operation: RenderableOperation) -> bool:
+        return any(parameter.fieldType.rawType == RenderableRawTypes.FILE for parameter in operation.parameters)
 
     def type(self, renderableType: RenderableType, apiVersion: Version, isLocalReference: bool = False) -> str:
         return self.render_type(renderableType=renderableType, apiVersion=apiVersion, isLocalReference=isLocalReference)
@@ -334,9 +346,19 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
     def string_type(self, isNullable: bool) -> str:
         return 'str | None' if isNullable else 'str'
 
-    def enum_type(self, isNullable: bool, values: list[str]) -> str:
-        valueString = ', '.join([f"'{value}'" for value in values])
-        return f'typing.Literal[{valueString}] | None' if isNullable else f'Literal[{valueString} | None'
+    def enum_type(self, isNullable: bool, renderableType: RenderableType, apiVersion: Version, isLocalReference: bool) -> str:
+        if renderableType.className is None:
+            typeName = self.enum_literal(values=renderableType.enumValues)
+        else:
+            typeName = f'{renderableType.className.pascalCaseString}V{apiVersion.major}' if isLocalReference else f'resources.{renderableType.className.pascalCaseString}V{apiVersion.major}'
+        return f'{typeName} | None' if isNullable else typeName
+
+    @staticmethod
+    def enum_literal(values: list[str]) -> str:
+        return f'typing.Literal[{", ".join(repr(value) for value in values)}]'
+
+    def file_type(self, isNullable: bool) -> str:
+        return 'UploadedFile | None' if isNullable else 'UploadedFile'
 
     def package_name(self, api: RenderableApi) -> str:
         return f'{self.snake_name(name=api.serviceName)}_api'
@@ -392,6 +414,16 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
 
     def resources_require_json(self, api: RenderableApi) -> bool:
         return any(self._contains_json(renderableType=attribute.fieldType) for resource in api.resources for attribute in resource.attributes)
+
+    def resources_require_typing(self, api: RenderableApi) -> bool:
+        return len(api.enums) > 0 or any(self.is_inline_enum(renderableType=attribute.fieldType) for resource in api.resources for attribute in resource.attributes)
+
+    def operations_require_typing(self, api: RenderableApi) -> bool:
+        fieldTypes = [parameter.fieldType for operation in api.operations for parameter in operation.parameters] + [field.fieldType for operation in api.operations for field in operation.responseFields or []]
+        return any(self.is_inline_enum(renderableType=fieldType) for fieldType in fieldTypes)
+
+    def requires_uploaded_file(self, api: RenderableApi) -> bool:
+        return any(self.is_file_operation(operation=operation) for operation in api.operations)
 
     def operations_require_json(self, api: RenderableApi) -> bool:
         fieldTypes = [parameter.fieldType for operation in api.operations for parameter in operation.parameters] + [field.fieldType for operation in api.operations for field in operation.responseFields or []]
@@ -516,6 +548,19 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
     def string_type(self, isNullable: bool) -> str:
         return self._nullable(typeName='string', isNullable=isNullable)
 
+    def enum_type(self, isNullable: bool, renderableType: RenderableType, apiVersion: Version, isLocalReference: bool) -> str:
+        if renderableType.className is None:
+            return self._nullable(typeName=f'({self.enum_union(values=renderableType.enumValues)})', isNullable=isNullable)
+        typeName = f'{renderableType.className.pascalCaseString}V{apiVersion.major}'
+        return self._nullable(typeName=typeName if isLocalReference else f'Resources.{typeName}', isNullable=isNullable)
+
+    @staticmethod
+    def enum_union(values: list[str]) -> str:
+        return ' | '.join(f"'{value}'" for value in values)
+
+    def file_type(self, isNullable: bool) -> str:
+        return self._nullable(typeName='File', isNullable=isNullable)
+
     def package_name(self, api: RenderableApi) -> str:
         return f'{self.kebab_name(name=api.serviceName)}-api'
 
@@ -566,7 +611,11 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
         return f'on{self.pascal_name(name=responseField.name)}'
 
     def references_resources(self, renderableTypes: list[RenderableType]) -> bool:
-        return any(self._contains_raw_type(renderableType=renderableType, rawType=rawType) for renderableType in renderableTypes for rawType in ('class', PrimitiveTypes.JSON))
+        valueTypes = [self._value_type(renderableType=renderableType) for renderableType in renderableTypes]
+        return any(valueType.rawType in ('class', PrimitiveTypes.JSON) or (valueType.rawType == RenderableRawTypes.ENUM and valueType.className is not None) for valueType in valueTypes)
+
+    def _value_type(self, renderableType: RenderableType) -> RenderableType:
+        return self._value_type(renderableType=renderableType.valueType) if isinstance(renderableType, MappingRenderableType) else renderableType
 
     def requires_date_parsing(self, renderableTypes: list[RenderableType]) -> bool:
         return any(self._contains_raw_type(renderableType=renderableType, rawType=rawType) for renderableType in renderableTypes for rawType in (PrimitiveTypes.DATE, PrimitiveTypes.DATETIME))
@@ -579,6 +628,18 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
 
     def body_parameter_types(self, api: RenderableApi) -> list[RenderableType]:
         return [parameter.fieldType for operation in self.client_operations(api=api) for parameter in self.body_parameters(operation=operation)]
+
+    def requires_request_data(self, api: RenderableApi) -> bool:
+        return any(self.body_parameters(operation=operation) and not self.is_file_operation(operation=operation) for operation in self.client_operations(api=api))
+
+    def form_value(self, renderableType: RenderableType, value: str) -> str:
+        if renderableType.rawType == RenderableRawTypes.FILE:
+            return value
+        if renderableType.rawType == PrimitiveTypes.DATETIME:
+            return f'dateToString({value})'
+        if renderableType.rawType == PrimitiveTypes.DATE:
+            return f"dateToString({value}, 'yyyy-MM-dd')"
+        return f'String({value})'
 
     def _contains_raw_type(self, renderableType: RenderableType, rawType: str) -> bool:
         if isinstance(renderableType, MappingRenderableType):
@@ -609,6 +670,8 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
             return f'dateFromString(String({value}))'
         if renderableType.rawType == PrimitiveTypes.JSON:
             return f'{value} as {self.type(renderableType=renderableType, apiVersion=apiVersion, isLocalReference=isLocalReference)}'
+        if renderableType.rawType == RenderableRawTypes.ENUM:
+            return f'String({value}) as {self.type(renderableType=renderableType, apiVersion=apiVersion, isLocalReference=isLocalReference)}'
         raise KibaException(f'Failed to render conversion from object for: {renderableType}')
 
     def _is_serialized_as_is(self, renderableType: RenderableType) -> bool:

@@ -3,12 +3,21 @@ from __future__ import annotations
 
 import collections.abc
 import datetime
+{% if target.resources_require_typing(api=api) %}
+import typing
+{% endif %}
 
 {% if target.resources_require_json(api=api) %}
 import pydantic
 {% endif %}
 from pydantic import BaseModel
 
+{% for enum in api.enums %}
+{{ target.enum_class_name(enum=enum, apiVersion=api.version) }} = {{ target.enum_literal(values=enum.values) }}
+{% if loop.last %}
+
+{% endif %}
+{% endfor %}
 {% for resource in api.resources %}
 
 class {{ target.resource_class_name(resource=resource, apiVersion=api.version) }}(BaseModel):
