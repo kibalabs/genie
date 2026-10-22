@@ -68,7 +68,9 @@ make install-typescript-client
 make test-typescript-client
 ```
 
-Merges to `main` publish a dev version to PyPI. To release, bump `version` in `pyproject.toml` in a PR, then run the Release workflow on `main` (Actions → Release → Run workflow). It tags `vX.Y.Z` and the Publish workflow publishes it. Only the release workflow can push version tags.
+Merges to `main` publish a dev version to PyPI, except for changes that only touch the landing page. To release, bump `version` in `pyproject.toml` in a PR, then run the Release workflow on `main` (Actions → Release → Run workflow). It tags `vX.Y.Z` and the Publish workflow publishes it. Only the release workflow can push version tags.
+
+`landing/` is the static site for genie.kibalabs.com (plain HTML, CSS and JS, no build step). Preview it with `python3 -m http.server --directory landing`. Merges that touch it sync it to the kiba sites bucket and invalidate CloudFront (`.github/workflows/landing-deploy.yml`).
 
 # Things that need work
 

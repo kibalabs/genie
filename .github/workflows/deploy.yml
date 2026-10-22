@@ -2,6 +2,9 @@ name: Deploy
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'landing/**'
+      - '.github/workflows/landing-deploy.yml'
 jobs:
   deploy-package-next:
     runs-on: ubuntu-latest
