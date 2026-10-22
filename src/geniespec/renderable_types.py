@@ -87,11 +87,23 @@ class RenderableString(BaseModel):
         return cls(string=string.split(separator))
 
 
+class RenderableRawTypes:
+    CLASS = 'class'
+    ENUM = 'enum'
+    FILE = 'file'
+
+
 class RenderableType(BaseModel):
     rawType: str
     isNullable: bool
     isList: bool = False
     className: RenderableString | None = None
+    enumValues: list[str] = []
+
+
+class RenderableEnum(BaseModel):
+    name: RenderableString
+    values: list[str]
 
 
 class MappingRenderableType(RenderableType):
@@ -225,6 +237,7 @@ class RenderableApi(BaseModel):
     resources: list[RenderableResource]
     operations: list[RenderableOperation]
     exceptions: list[RenderableException]
+    enums: list[RenderableEnum] = []
 
 
 class ProcessableResource(BaseModel):

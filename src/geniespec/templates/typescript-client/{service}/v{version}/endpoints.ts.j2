@@ -5,7 +5,7 @@
 {% if target.requires_date_parsing(renderableTypes=responseTypes) %}{% set _ = coreImports.append('dateFromString') %}{% endif %}
 {% if target.requires_date_parsing(renderableTypes=bodyTypes) %}{% set _ = coreImports.append('dateToString') %}{% endif %}
 {% set _ = coreImports.append('RawObject') %}
-{% if bodyTypes %}{% set _ = coreImports.append('RequestData') %}{% endif %}
+{% if target.requires_request_data(api=api) %}{% set _ = coreImports.append('RequestData') %}{% endif %}
 {% if responseTypes %}{% set _ = coreImports.append('ResponseData') %}{% endif %}
 import { {{ coreImports | join(', ') }} } from '@kibalabs/core';
 {% if target.references_resources(renderableTypes=responseTypes + bodyTypes) %}
@@ -24,6 +24,29 @@ export interface {{ className }}Params {
 {% endfor %}
 }
 
+{% if target.is_file_operation(operation=operation) %}
+export class {{ className }}Request {
+  public constructor(
+    readonly params: {{ className }}Params,
+  ) { }
+
+  public toFormData = (): FormData => {
+    const formData = new FormData();
+{% for parameter in bodyParameters %}
+{% set parameterName = target.identifier(name=parameter.name) %}
+{% set value = 'this.params.' ~ parameterName %}
+{% if target.is_parameter_required(operation=operation, parameter=parameter) and not target.parameter_field_type(operation=operation, parameter=parameter).isNullable %}
+    formData.append('{{ parameterName }}', {{ target.form_value(renderableType=parameter.fieldType, value=value) }});
+{% else %}
+    if ({{ value }} != null) {
+      formData.append('{{ parameterName }}', {{ target.form_value(renderableType=parameter.fieldType, value=value) }});
+    }
+{% endif %}
+{% endfor %}
+    return formData;
+  };
+}
+{% else %}
 export class {{ className }}Request extends RequestData {
   public constructor(
     readonly params: {{ className }}Params,
@@ -39,6 +62,7 @@ export class {{ className }}Request extends RequestData {
     };
   };
 }
+{% endif %}
 {% endif %}
 {% if responseField %}
 

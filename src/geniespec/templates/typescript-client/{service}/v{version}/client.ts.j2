@@ -21,7 +21,14 @@ export class {{ target.client_class_name(api=api) }} extends ServiceClient {
 {% if not loop.first %}
 
 {% endif %}
-{% if target.is_streaming(operation=operation) %}
+{% if target.is_file_operation(operation=operation) %}
+  public {{ target.operation_name(operation=operation) }} = async ({{ arguments | join(', ') }}): Promise<{{ target.type(renderableType=responseField.fieldType, apiVersion=api.version) if responseField else 'void' }}> => {
+    {% if responseField %}const response = {% endif %}await this.requester.makeFormRequest(`${this.baseUrl}/{{ path }}`, {{ request }}.toFormData());
+{% if responseField %}
+    return Endpoints.{{ className }}Response.fromObject(JSON.parse(response.content)).{{ target.identifier(name=responseField.name) }};
+{% endif %}
+  };
+{% elif target.is_streaming(operation=operation) %}
   public {{ target.operation_name(operation=operation) }} = async ({{ arguments | join(', ') }}): Promise<void> => {
     await this.makeStreamingRequest(RestMethod.{{ target.http_method(operation=operation) }}, {{ pathLiteral }}, {{ request }}, Endpoints.{{ className }}Response, (response: Endpoints.{{ className }}Response): void => {
       {{ target.stream_callback_name(operation=operation) }}(response.{{ target.identifier(name=responseField.name) }});

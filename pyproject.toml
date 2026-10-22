@@ -22,7 +22,7 @@ repository = "https://github.com/kibalabs/genie"
 [dependency-groups]
 dev = [
     "kiba-build==0.1.11.dev15",
-    "kiba-core[core-api,requester]>=0.5.3.dev81,<0.5.4",
+    "kiba-core[core-api,requester]>=0.5.3.dev87,<0.5.4",
 ]
 
 [build-system]
