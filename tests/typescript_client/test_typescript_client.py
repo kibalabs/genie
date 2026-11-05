@@ -355,6 +355,55 @@ def test_typescript_client_parses_and_sends_one_of_fields_by_discriminator(tmp_p
     assert output['unknownError'] == 'Unknown ViewContentV1 kind: graph'
 
 
+BIG_INT_SPEC = """
+resources:
+  - singleName: Position
+    collectionName: Positions
+    attributes:
+      - name: position-id
+        type: String
+        isPrimary: true
+      - name: amount-raw
+        type: BigInt
+    transitions:
+      - action: GET
+      - action: WITHDRAW
+        operatesOn: individual
+        requestFields:
+          - name: amount-raw
+            type: BigInt
+            isRequired: true
+        responseField:
+          name: withdrawn-raw
+          type: BigInt
+"""
+BIG_INT_SCRIPT = """
+import { Requester, RestMethod } from '@kibalabs/core';
+
+import { GenieTestApiV1Client } from './genie-test-api/v1';
+
+const calls: Record<string, unknown>[] = [];
+const requester = {
+  makeRequest: async (method: RestMethod, url: string, data?: Record<string, unknown>): Promise<{ content: string }> => {
+    calls.push({ method, url, data: JSON.parse(JSON.stringify(data ?? null)) });
+    const content = method === RestMethod.GET ? { position: { positionId: 'p1', amountRaw: '123456789012345678901234567' } } : { withdrawnRaw: '123456789012345678901234568' };
+    return { content: JSON.stringify(content) };
+  },
+} as unknown as Requester;
+
+const client = new GenieTestApiV1Client(requester, 'https://api.test/v1');
+const position = await client.getPosition('p1');
+const withdrawnRaw: bigint = await client.withdrawPosition('p1', { amountRaw: position.amountRaw + 1n });
+console.log(JSON.stringify({ calls, isBigInt: typeof position.amountRaw === 'bigint', amountRaw: position.amountRaw.toString(), withdrawnRaw: withdrawnRaw.toString() }));
+"""
+
+
+def test_typescript_client_parses_and_sends_big_ints_as_strings(tmp_path: pathlib.Path) -> None:
+    output = _run_typescript(specYaml=BIG_INT_SPEC, script=BIG_INT_SCRIPT, directory=tmp_path)
+    assert (output['isBigInt'], output['amountRaw'], output['withdrawnRaw']) == (True, '123456789012345678901234567', '123456789012345678901234568')
+    assert output['calls'][1] == {'method': 'post', 'url': 'https://api.test/v1/positions/p1/withdraw', 'data': {'amountRaw': '123456789012345678901234568'}}
+
+
 def test_typescript_client_rejects_names_reserved_in_typescript(tmp_path: pathlib.Path) -> None:
     specYaml = """
 resources:

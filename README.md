@@ -56,6 +56,8 @@ Fields use it like any other type (`type: ViewContent`, also inside `List` and `
 
 `type: Uuid` is a string that must be a valid UUID. It works anywhere `String` does, including as a primary attribute in paths. `python-server` types it as `uuid.UUID`, so pydantic rejects other strings with a 400, internal methods get `uuid.UUID` objects and responses write them in the standard lowercase hyphenated form; `typescript-client` types it as `string`.
 
+`type: BigInt` is an integer of any size that travels as a JSON string, because JSON numbers past 2^53 lose precision in JavaScript. `python-server` types it as `int` (a `BigInt` alias in `resources`), accepts `"123"` or `123` in requests, always writes it as a string and documents it as `{"type": "string"}`; `typescript-client` types it as `bigint`, parsed with `BigInt(...)` and sent with `String(...)`.
+
 ## Rate limits
 
 Name rate limits at the top level, then pick one per transition with `rateLimit`. `defaultRateLimit` applies to every transition that doesn't set one, and `rateLimit: none` turns it off for a transition, the same way `defaultAuthentication` and `authentication` work:

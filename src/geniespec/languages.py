@@ -78,6 +78,9 @@ class BaseLanguageDefinition:
     def uuid_type(self, isNullable: bool) -> str:
         raise NotImplementedError
 
+    def big_int_type(self, isNullable: bool, isLocalReference: bool) -> str:
+        raise NotImplementedError
+
     def enum_type(self, isNullable: bool, renderableType: RenderableType, apiVersion: Version, isLocalReference: bool) -> str:
         raise NotImplementedError
 
@@ -117,6 +120,8 @@ class BaseLanguageDefinition:
             return self.string_type(isNullable=isNullable)
         if yamlType == PrimitiveTypes.UUID:
             return self.uuid_type(isNullable=isNullable)
+        if yamlType == PrimitiveTypes.BIG_INT:
+            return self.big_int_type(isNullable=isNullable, isLocalReference=isLocalReference)
         if yamlType == PrimitiveTypes.BOOLEAN:
             return self.boolean_type(isNullable=isNullable)
         if yamlType == PrimitiveTypes.DATETIME:
@@ -353,6 +358,10 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
     def uuid_type(self, isNullable: bool) -> str:
         return 'uuid.UUID | None' if isNullable else 'uuid.UUID'
 
+    def big_int_type(self, isNullable: bool, isLocalReference: bool) -> str:
+        typeName = 'BigInt' if isLocalReference else 'resources.BigInt'
+        return f'{typeName} | None' if isNullable else typeName
+
     def enum_type(self, isNullable: bool, renderableType: RenderableType, apiVersion: Version, isLocalReference: bool) -> str:
         if renderableType.className is None:
             typeName = self.enum_literal(values=renderableType.enumValues)
@@ -487,10 +496,13 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
             'collections': lambda part: part.isList or isinstance(part, MappingRenderableType),
             'datetime': lambda part: part.rawType in (PrimitiveTypes.DATETIME, PrimitiveTypes.DATE),
             'json': lambda part: part.rawType == PrimitiveTypes.JSON,
-            'resources': lambda part: part.className is not None,
+            'resources': lambda part: part.className is not None or part.rawType == PrimitiveTypes.BIG_INT,
             'uuid': lambda part: part.rawType == PrimitiveTypes.UUID,
         }
         return any(predicates[requirement](part) for fieldType in self._module_field_types(api=api, module=module) for part in self._type_parts(renderableType=fieldType))
+
+    def requires_big_int(self, api: RenderableApi) -> bool:
+        return any(part.rawType == PrimitiveTypes.BIG_INT for module in ('resources', 'internal', 'exceptions') for fieldType in self._module_field_types(api=api, module=module) for part in self._type_parts(renderableType=fieldType))
 
     def resources_require_typing(self, api: RenderableApi) -> bool:
         return len(api.enums) > 0 or len(api.oneOfs) > 0 or any(self.is_inline_enum(renderableType=attribute.fieldType) for resource in api.resources for attribute in resource.attributes)
@@ -601,6 +613,9 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
 
     def long_integer_type(self, isNullable: bool) -> str:
         return self._nullable(typeName='number', isNullable=isNullable)
+
+    def big_int_type(self, isNullable: bool, isLocalReference: bool) -> str:  # noqa: ARG002
+        return self._nullable(typeName='bigint', isNullable=isNullable)
 
     def mapping_type(self, isNullable: bool, keyType: str, valueType: str) -> str:  # noqa: ARG002
         # NOTE(krishan711): json object keys are always strings
@@ -752,6 +767,8 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
             return f'String({value})'
         if renderableType.rawType in (PrimitiveTypes.INTEGER, PrimitiveTypes.LONG_INTEGER, PrimitiveTypes.FLOAT, PrimitiveTypes.DOUBLE):
             return f'Number({value})'
+        if renderableType.rawType == PrimitiveTypes.BIG_INT:
+            return f'BigInt(String({value}))'
         if renderableType.rawType == PrimitiveTypes.BOOLEAN:
             return f'Boolean({value})'
         if renderableType.rawType in (PrimitiveTypes.DATE, PrimitiveTypes.DATETIME):
@@ -765,7 +782,7 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
     def _is_serialized_as_is(self, renderableType: RenderableType) -> bool:
         if isinstance(renderableType, MappingRenderableType):
             return self._is_serialized_as_is(renderableType=renderableType.valueType)
-        return renderableType.rawType not in ('class', RenderableRawTypes.ONE_OF, PrimitiveTypes.DATE, PrimitiveTypes.DATETIME)
+        return renderableType.rawType not in ('class', RenderableRawTypes.ONE_OF, PrimitiveTypes.DATE, PrimitiveTypes.DATETIME, PrimitiveTypes.BIG_INT)
 
     def to_object(self, renderableType: RenderableType, value: str, apiVersion: Version, isOptional: bool = False, isLocalReference: bool = False) -> str:
         if self._is_serialized_as_is(renderableType=renderableType):
@@ -787,4 +804,6 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
             return f'dateToString({value})'
         if renderableType.rawType == PrimitiveTypes.DATE:
             return f"dateToString({value}, 'yyyy-MM-dd')"
+        if renderableType.rawType == PrimitiveTypes.BIG_INT:
+            return f'String({value})'
         raise KibaException(f'Failed to render conversion to object for: {renderableType}')

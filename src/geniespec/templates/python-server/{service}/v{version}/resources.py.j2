@@ -7,20 +7,24 @@ import collections.abc
 {% if target.module_requires(api=api, module='resources', requirement='datetime') %}
 import datetime
 {% endif %}
-{% if target.resources_require_typing(api=api) %}
+{% if target.resources_require_typing(api=api) or target.requires_big_int(api=api) %}
 import typing
 {% endif %}
 {% if target.module_requires(api=api, module='resources', requirement='uuid') %}
 import uuid
 {% endif %}
 
-{% if target.module_requires(api=api, module='resources', requirement='json') or api.oneOfs or target.resources_require_field(api=api) %}
+{% if target.module_requires(api=api, module='resources', requirement='json') or api.oneOfs or target.resources_require_field(api=api) or target.requires_big_int(api=api) %}
 import pydantic
 {% endif %}
 {% if api.resources %}
 from pydantic import BaseModel
 {% endif %}
 
+{% if target.requires_big_int(api=api) %}
+BigInt = typing.Annotated[int, pydantic.PlainSerializer(str, return_type=str), pydantic.WithJsonSchema({'type': 'string'})]
+
+{% endif %}
 {% for enum in api.enums %}
 {{ target.enum_class_name(enum=enum, apiVersion=api.version) }} = {{ target.enum_literal(values=enum.values) }}
 {% if loop.last %}
