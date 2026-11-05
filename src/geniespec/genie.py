@@ -529,6 +529,7 @@ class Renderer:
                 authentication = transition.authentication or api.defaultAuthentication
                 rateLimit = transition.rateLimit or api.defaultRateLimit
                 operationCount = len(renderableApi.operations)
+                lookupOperations: list[tuple[RenderableOperation, Attribute]] = []
                 method: RenderableMethod = self._transition_to_renderable_method(transition=transition)
                 if transition.isIndirectAction and transition.action.upper() in {'DELETE', 'CREATE', 'UPDATE', 'GET', 'LIST'}:
                     raise SemanticValidationException(message=f'Only custom transitions can be indirect actions: {transition.action}')
@@ -577,7 +578,7 @@ class Renderer:
                                 ),
                             ]
                         )
-                        renderableApi.operations.append(RenderableOperation(method=method, endpoint=getByUniqueEndpoint, query=None, body=None, responseFields=[returnValue], authentication=authentication, rateLimit=rateLimit))
+                        lookupOperations.append((RenderableOperation(method=method, endpoint=getByUniqueEndpoint, query=None, body=None, responseFields=[returnValue], authentication=authentication, rateLimit=rateLimit), attribute))
                 elif transition.action.upper() == 'LIST':
                     returnValue = RenderableField(name=processableResource.renderableResource.collectionName, fieldType=RenderableType(rawType='class', className=processableResource.renderableResource.singleName, isNullable=False, isList=True))
                     query = [self._request_field_to_renderable_parameter(requestField=requestField, knownTypeNames=knownTypeNames) for requestField in transition.requestFields]
@@ -595,6 +596,9 @@ class Renderer:
                         renderableApi.operations.append(self._action_operation(transition=transition, endpoint=customEndpoint, knownTypeNames=knownTypeNames, defaultAuthentication=api.defaultAuthentication, defaultRateLimit=api.defaultRateLimit, isIndirectAction=transition.isIndirectAction))
                 isStandard = transition.action.upper() in {'CREATE', 'UPDATE', 'GET', 'LIST'}
                 renderableApi.operations[operationCount:] = [self._with_transition_fields(operation=operation, transition=transition, isStandard=isStandard) for operation in renderableApi.operations[operationCount:]]
+                for operation, attribute in lookupOperations:
+                    lookupOperationId = f'{transition.operationId}By{RenderableString.from_kebab_case_string(string=attribute.name).pascalCaseString}' if transition.operationId is not None else None
+                    renderableApi.operations.append(self._with_transition_fields(operation=operation, transition=transition, isStandard=isStandard).model_copy(update={'operationId': lookupOperationId}))
                 if len(renderableApi.operations) == operationCount:
                     uncoveredTransitions.append(f'{renderableResource.singleName.pascalCaseString} {transition.action}')
         if uncoveredTransitions:

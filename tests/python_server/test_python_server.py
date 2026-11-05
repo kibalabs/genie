@@ -1132,6 +1132,36 @@ transitions:
     assert extensionRecorder.extensions == {'getMember': {'deprecated': True}, 'rename': {}}
 
 
+def test_get_lookups_derive_their_operation_ids_from_the_get(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _generate(
+        specYaml="""
+resources:
+  - singleName: Member
+    collectionName: Members
+    attributes:
+      - name: member-id
+        type: String
+        isPrimary: true
+      - name: email-address
+        type: String
+        isUnique: true
+    transitions:
+      - action: GET
+        operationId: getMember
+        summary: Get a member
+        tags: [Members]
+""",
+        outputDirectory=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    schemaGenerator = OpenApiSchemaGenerator(title='Test', version='1', description='', tags=[OpenApiTag(name='Members')], securitySchemes=[], extensions=[])
+    paths = typing.cast(dict[str, dict[str, dict[str, typing.Any]]], schemaGenerator.get_schema(routes=_routes(calls={}, returnValues={}))['paths'])  # type: ignore[explicit-any]
+    assert {path: (operations['get']['operationId'], operations['get']['summary'], operations['get']['tags']) for path, operations in paths.items()} == {
+        '/members/{memberId}': ('getMember', 'Get a member', ['Members']),
+        '/members/email-address/{emailAddress}': ('getMemberByEmailAddress', 'Get a member', ['Members']),
+    }
+
+
 def test_child_resources_can_keep_their_own_names_under_their_parent(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _generate(
         specYaml="""
@@ -1700,12 +1730,18 @@ resources:
       - name: member-id
         type: String
         isPrimary: true
-      - name: email
+  - singleName: Note
+    collectionName: Notes
+    parentResource: Member
+    accessibleFrom:
+      - root
+    attributes:
+      - name: member-note-id
         type: String
-        isUnique: true
+        isPrimary: true
     transitions:
       - action: GET
-        operationId: getMember
+        operationId: getNote
 transitions:
   - action: PING
     operationId: ping
@@ -1713,7 +1749,7 @@ transitions:
     operationId: ping
 """,
             [
-                'Duplicate operationId: getMember',
+                'Duplicate operationId: getNote',
                 'Duplicate operationId: ping',
             ],
             id='duplicate-operation-ids',
