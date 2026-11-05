@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Genie · One spec. A typed server and a typed client.</title>
-  <meta name="description" content="Genie turns one api.yaml into a typed Python server and a typed TypeScript client. Build-time code generation with validation, enums, oneOfs, streams, file uploads and watch mode." />
-  <meta property="og:title" content="Genie · One spec. A typed server and a typed client." />
-  <meta property="og:description" content="Build-time API code generation from a single api.yaml: pydantic + starlette on the server, a typed ServiceClient in the browser." />
+  <title>Genie · Resource-oriented APIs, typed end to end</title>
+  <meta name="description" content="Genie turns a resource-oriented api.yaml into a typed server and typed clients. Inspired by Google's AIP-121. The generator is language-agnostic; Python (pydantic + starlette) and TypeScript targets are live today." />
+  <meta property="og:title" content="Genie · Resource-oriented APIs, typed end to end" />
+  <meta property="og:description" content="Describe resources, their hierarchy and a few standard methods in one api.yaml. Genie checks the design and generates the server and the clients." />
   <meta name="theme-color" content="#07060f" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/styles.css" />
@@ -31,9 +31,10 @@
       <span>genie</span>
     </a>
     <nav class="nav-links" aria-label="Sections">
-      <a href="#pipeline">Pipeline</a>
+      <a href="#why">Why</a>
+      <a href="#principles">Principles</a>
       <a href="#explorer">Output</a>
-      <a href="#types">Types</a>
+      <a href="#targets">Targets</a>
       <a href="#watch">Watch</a>
       <a class="nav-cta" href="https://github.com/kibalabs/genie">GitHub</a>
     </nav>
@@ -43,8 +44,9 @@
     <section class="hero">
       <div class="hero-copy reveal">
         <p class="eyebrow"><span class="pulse"></span> geniespec 0.1.1 · MIT · build-time only</p>
-        <h1>One spec.<br /><span class="gradient-text">A typed server<br />and a typed client.</span></h1>
-        <p class="lede">Genie turns a single <code>api.yaml</code> into a <strong>pydantic + starlette</strong> Python server and a <strong>TypeScript</strong> client. Both sides are generated from the same contract at build time, so they can't drift apart.</p>
+        <h1>Well-typed,<br /><span class="gradient-text nowrap">resource-oriented</span><br />APIs.</h1>
+        <p class="lede">Describe your API as <strong>resources</strong>, their <strong>hierarchy</strong> and a small set of <strong>standard methods</strong> in one <code>api.yaml</code>. Genie checks the design, then generates a typed server and typed clients from it, so every endpoint follows the same rules and both sides agree.</p>
+        <p class="live-targets"><span>Live targets</span><b>Python server · pydantic + starlette</b><b>TypeScript client</b><i>the core is language-agnostic</i></p>
         <div class="install">
           <span class="prompt">$</span>
           <code id="install-command">uvx geniespec build --spec api.yaml --target python-server</code>
@@ -78,11 +80,114 @@
       </div>
     </section>
 
+    <section id="why" class="section story">
+      <div class="story-grid">
+        <figure class="story-quote reveal">
+          <p class="eyebrow">Why Genie exists</p>
+          <blockquote>
+            <p>I've worked at a lot of companies and built thousands of APIs, back when we wrote every one of them by hand. Now, with agents, I can write thousands in a day.</p>
+            <p>Writing them stopped being the hard part. Things get messy quickly when the core resource-oriented principles aren't followed: every endpoint invents its own shape, and that causes pain and confusion for everyone who has to call it or change it. A messy API is so much harder to maintain than a clean, clear, resource-based one.</p>
+            <p>Genie keeps those principles in the spec and the generator instead of in people's heads, so the API stays consistent no matter who, or what, writes the next endpoint.</p>
+          </blockquote>
+          <figcaption><span class="avatar" aria-hidden="true">K</span><span><b>Krishan</b><small>Kiba Labs</small></span></figcaption>
+        </figure>
+        <div class="drift reveal" aria-label="The same five operations written ad hoc and resource-oriented">
+          <div class="drift-panel messy">
+            <p class="drift-title">Ad hoc</p>
+            <ul>
+              <li><i class="post">POST</i> /getBooksForShelf</li>
+              <li><i class="get">GET</i> /fetchBook/{bookID}</li>
+              <li><i class="post">POST</i> /shelf/{id}/addBook</li>
+              <li><i class="get">GET</i> /books/remove?id=…</li>
+              <li><i class="post">POST</i> /api/moveBook</li>
+            </ul>
+          </div>
+          <div class="drift-arrow" aria-hidden="true"><span></span></div>
+          <div class="drift-panel clean">
+            <p class="drift-title">Resource-oriented</p>
+            <ul>
+              <li><i class="get">GET</i> /shelves/{shelfId}/books</li>
+              <li><i class="get">GET</i> /shelves/{shelfId}/books/{shelfBookId}</li>
+              <li><i class="post">POST</i> /shelves/{shelfId}/books</li>
+              <li><i class="delete">DELETE</i> /shelves/{shelfId}/books/{shelfBookId}</li>
+              <li><i class="post">POST</i> /shelves/{shelfId}/books/{shelfBookId}/move</li>
+            </ul>
+          </div>
+          <p class="drift-note">The right-hand column is what Genie generates for a <code>Book</code> nested under a <code>Shelf</code> with LIST, GET, CREATE, DELETE and a custom MOVE.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="principles" class="section">
+      <div class="section-head reveal">
+        <p class="eyebrow">Inspired by AIP-121</p>
+        <h2>The design rules live in the generator</h2>
+        <p>Genie follows Google's <a href="https://google.aip.dev/121">AIP-121: Resource-oriented design</a>. An API is made of named resources (nouns) and the hierarchy between them, with a small number of standard methods (verbs) and custom methods for whatever doesn't fit. In Genie those ideas are the shape of the spec: routes, names and types are derived from it, and the build rejects specs that break the rules.</p>
+      </div>
+      <div class="principle-grid">
+        <article class="principle reveal">
+          <span class="principle-index">01</span>
+          <h3>Resources are nouns</h3>
+          <p>Each resource has a single name, a collection name and a primary attribute called <code>&lt;resource&gt;-id</code>. Paths come from those names, so you never write one.</p>
+          <code class="principle-sample">Book · Books · book-id → /books/{bookId}</code>
+        </article>
+        <article class="principle reveal">
+          <span class="principle-index">02</span>
+          <h3>Hierarchy, not ad hoc paths</h3>
+          <p><code>parentResource: Shelf</code> nests books under shelves. Routes, method names and ids all follow the hierarchy.</p>
+          <code class="principle-sample">/shelves/{shelfId}/books/{shelfBookId}</code>
+        </article>
+        <article class="principle reveal">
+          <span class="principle-index">03</span>
+          <h3>Standard methods first</h3>
+          <p>LIST, GET, CREATE, UPDATE and DELETE have fixed HTTP methods and routes. Most of an API should be these five.</p>
+          <code class="principle-sample">GET · GET · POST · PATCH · DELETE</code>
+        </article>
+        <article class="principle reveal">
+          <span class="principle-index">04</span>
+          <h3>Custom methods when needed</h3>
+          <p>Anything else is a named action on one resource or on the whole collection. <a href="https://google.aip.dev/136">AIP-136</a> puts the verb after a colon; Genie puts it in the path.</p>
+          <code class="principle-sample">MOVE → POST …/books/{shelfBookId}/move</code>
+        </article>
+        <article class="principle reveal">
+          <span class="principle-index">05</span>
+          <h3>One shape per resource</h3>
+          <p>LIST, GET, CREATE and UPDATE all return the same resource class, so a client never sees two versions of a book.</p>
+          <code class="principle-sample">shelfBook: ShelfBookV1</code>
+        </article>
+        <article class="principle reveal">
+          <span class="principle-index">06</span>
+          <h3>Typed all the way down</h3>
+          <p>Every field has a type, nullability and a required flag. Enums, oneOfs and files are types too, and the server rejects values that don't match.</p>
+          <code class="principle-sample">status: ReadingStatus · isNullable: true</code>
+        </article>
+      </div>
+    </section>
+
+    <section class="section routes-section">
+      <div class="section-head reveal">
+        <p class="eyebrow">Names are derived, not declared</p>
+        <h2>Every method becomes a route and typed code on both sides</h2>
+        <p>Resource and action names decide the HTTP route, the method you implement on the server and the method you call on the client. Every target uses the same rule; here it is for the two live ones.</p>
+      </div>
+      <div class="route-table reveal" role="table" aria-label="Transitions mapped to routes and methods">
+        <div class="route-row head" role="row">
+          <span role="columnheader">Spec</span><span role="columnheader">Route</span><span role="columnheader">Python internal</span><span role="columnheader">TypeScript client</span>
+        </div>
+        <div class="route-row" role="row"><span role="cell"><b>LIST</b> Book</span><span role="cell"><i class="get">GET</i> /books</span><span role="cell">list_books_v1</span><span role="cell">listBooks</span></div>
+        <div class="route-row" role="row"><span role="cell"><b>GET</b> Book</span><span role="cell"><i class="get">GET</i> /books/{bookId}</span><span role="cell">get_book_v1</span><span role="cell">getBook</span></div>
+        <div class="route-row" role="row"><span role="cell"><b>CREATE</b> Book</span><span role="cell"><i class="post">POST</i> /books</span><span role="cell">create_book_v1</span><span role="cell">createBook</span></div>
+        <div class="route-row" role="row"><span role="cell"><b>UPDATE</b> Book</span><span role="cell"><i class="patch">PATCH</i> /books/{bookId}</span><span role="cell">update_book_v1</span><span role="cell">updateBook</span></div>
+        <div class="route-row" role="row"><span role="cell"><b>SUMMARISE</b> · stream</span><span role="cell"><i class="post">POST</i> /books/{bookId}/summarise</span><span role="cell">summarise_book_v1 → AsyncIterator</span><span role="cell">summariseBook(id, onChunk)</span></div>
+        <div class="route-row" role="row"><span role="cell"><b>UPLOAD-COVER</b> · File</span><span role="cell"><i class="post">POST</i> /books/{bookId}/upload-cover</span><span role="cell">upload_cover_book_v1(image: UploadedFile)</span><span role="cell">uploadCoverBook(id, { image })</span></div>
+      </div>
+    </section>
+
     <section class="stats reveal" aria-label="Genie at a glance">
-      <div class="stat"><strong data-count="1">1</strong><span>source of truth: <code>api.yaml</code></span></div>
-      <div class="stat"><strong data-count="2">2</strong><span>targets: <code>python-server</code> · <code>typescript-client</code></span></div>
-      <div class="stat"><strong data-count="5">5</strong><span>Python modules per API version</span></div>
-      <div class="stat"><strong data-count="0">0</strong><span>generated files in git: output is gitignored</span></div>
+      <div class="stat"><strong>1</strong><span>source of truth: <code>api.yaml</code></span></div>
+      <div class="stat"><strong>5</strong><span>standard methods: LIST · GET · CREATE · UPDATE · DELETE</span></div>
+      <div class="stat"><strong>2</strong><span>live targets: <code>python-server</code> · <code>typescript-client</code></span></div>
+      <div class="stat"><strong>0</strong><span>generated files in git: output is gitignored</span></div>
     </section>
 
     <section id="pipeline" class="section">
@@ -126,25 +231,6 @@
       </div>
     </section>
 
-    <section class="section routes-section">
-      <div class="section-head reveal">
-        <p class="eyebrow">Naming is derived, not declared</p>
-        <h2>Every transition becomes a route and two typed methods</h2>
-        <p>Resource and action names decide the HTTP route, the abstract Python method you implement, and the client method you call. Both sides use the same rule, so a server and client generated from one spec always agree.</p>
-      </div>
-      <div class="route-table reveal" role="table" aria-label="Transitions mapped to routes and methods">
-        <div class="route-row head" role="row">
-          <span role="columnheader">Spec</span><span role="columnheader">Route</span><span role="columnheader">Python internal</span><span role="columnheader">TypeScript client</span>
-        </div>
-        <div class="route-row" role="row"><span role="cell"><b>LIST</b> Book</span><span role="cell"><i class="get">GET</i> /books</span><span role="cell">list_books_v1</span><span role="cell">listBooks</span></div>
-        <div class="route-row" role="row"><span role="cell"><b>GET</b> Book</span><span role="cell"><i class="get">GET</i> /books/{bookId}</span><span role="cell">get_book_v1</span><span role="cell">getBook</span></div>
-        <div class="route-row" role="row"><span role="cell"><b>CREATE</b> Book</span><span role="cell"><i class="post">POST</i> /books</span><span role="cell">create_book_v1</span><span role="cell">createBook</span></div>
-        <div class="route-row" role="row"><span role="cell"><b>UPDATE</b> Book</span><span role="cell"><i class="patch">PATCH</i> /books/{bookId}</span><span role="cell">update_book_v1</span><span role="cell">updateBook</span></div>
-        <div class="route-row" role="row"><span role="cell"><b>SUMMARISE</b> · stream</span><span role="cell"><i class="post">POST</i> /books/{bookId}/summarise</span><span role="cell">summarise_book_v1 → AsyncIterator</span><span role="cell">summariseBook(id, onChunk)</span></div>
-        <div class="route-row" role="row"><span role="cell"><b>UPLOAD-COVER</b> · File</span><span role="cell"><i class="post">POST</i> /books/{bookId}/upload-cover</span><span role="cell">upload_cover_book_v1(image: UploadedFile)</span><span role="cell">uploadCoverBook(id, { image })</span></div>
-      </div>
-    </section>
-
     <section id="explorer" class="section">
       <div class="section-head reveal">
         <p class="eyebrow">Real output</p>
@@ -166,11 +252,51 @@
       </div>
     </section>
 
+    <section id="targets" class="section">
+      <div class="section-head reveal">
+        <p class="eyebrow">Language-agnostic core</p>
+        <h2>Any language. Two are live today.</h2>
+        <p>The spec says nothing about Python or TypeScript. Genie's core validates it and works out every resource, route, method name and type. A target then renders that model, and a target is only a language definition (type names, casing, reserved names) plus a folder of Jinja templates.</p>
+      </div>
+      <div class="target-flow reveal" aria-label="api.yaml flows through the core into each target">
+        <div class="flow-node"><b>api.yaml</b><small>resources · methods · types</small></div>
+        <div class="flow-link" aria-hidden="true"><span></span></div>
+        <div class="flow-node core"><b>core</b><small>validate · routes · names · types</small></div>
+        <div class="flow-link" aria-hidden="true"><span></span></div>
+        <div class="flow-targets">
+          <div class="flow-target live"><b>python-server</b><small>pydantic + starlette</small></div>
+          <div class="flow-target live"><b>typescript-client</b><small>@kibalabs/core</small></div>
+          <div class="flow-target next"><b>next target</b><small>language definition + templates</small></div>
+        </div>
+      </div>
+      <div class="target-grid">
+        <article class="target-card reveal">
+          <p class="target-status"><span class="pulse"></span> Live</p>
+          <h3>python-server</h3>
+          <p>pydantic resource models, starlette routes and one abstract class to implement. Request parsing, validation, auth hooks and streaming are generated.</p>
+          <code>&lt;service&gt;_api/v1/</code>
+        </article>
+        <article class="target-card reveal">
+          <p class="target-status"><span class="pulse"></span> Live</p>
+          <h3>typescript-client</h3>
+          <p>A typed client with a method per operation, resource classes, enum types and oneOf parsers, built on <code>@kibalabs/core</code>'s <code>ServiceClient</code>.</p>
+          <code>&lt;service&gt;-api/v1/</code>
+        </article>
+        <article class="target-card next reveal">
+          <p class="target-status">Bring your own</p>
+          <h3>Templates all the way</h3>
+          <p>The bundled templates are one kibalabs-style example. kiba-core, pydantic and starlette are choices the templates make, not the core, so a different stack or a new language is a new set of templates.</p>
+          <code>LanguageDefinition + templates/&lt;target&gt;/*.j2</code>
+        </article>
+      </div>
+    </section>
+
     <section id="types" class="section">
       <div class="section-head reveal">
         <p class="eyebrow">Type system</p>
-        <h2>One type, two languages</h2>
-        <p>Each spec type has a fixed rendering in each target. Nullable fields become <code>| None</code> in Python and <code>| null</code> in TypeScript, and dates are parsed and serialised for you.</p>
+        <h2>One type system, rendered per target</h2>
+        <p>Spec types are language-neutral and each target decides how to render them. These are the two live targets: nullable fields become <code>| None</code> in Python and <code>| null</code> in TypeScript, and dates are parsed and serialised for you.</p>
+        <p class="legend"><span class="py">python-server</span><span class="ts">typescript-client</span></p>
       </div>
       <div class="type-grid">
         <div class="type-card reveal"><h3>String · Integer · Float · Boolean</h3><p><code>str</code> <code>int</code> <code>float</code> <code>bool</code></p><p><code>string</code> <code>number</code> <code>boolean</code></p></div>
