@@ -13,11 +13,12 @@ class PrimitiveTypes:
     DOUBLE = 'Double'
     STRING = 'String'
     UUID = 'Uuid'
+    BIG_INT = 'BigInt'
     BOOLEAN = 'Boolean'
     DATETIME = 'Datetime'
     DATE = 'Date'
     JSON = 'Json'
-    ALL: ClassVar[list[str]] = [LONG_INTEGER, INTEGER, FLOAT, DOUBLE, STRING, UUID, BOOLEAN, DATETIME, DATE, JSON]
+    ALL: ClassVar[list[str]] = [LONG_INTEGER, INTEGER, FLOAT, DOUBLE, STRING, UUID, BIG_INT, BOOLEAN, DATETIME, DATE, JSON]
 
 
 class FieldSources:

@@ -963,6 +963,45 @@ transitions:
     assert (allowed_calls('/limited-by-default'), allowed_calls('/limited-by-override'), allowed_calls('/not-limited')) == (2, 3, 5)
 
 
+def test_big_int_fields_are_ints_in_code_and_strings_in_json(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _generate(
+        specYaml="""
+resources:
+  - singleName: Position
+    collectionName: Positions
+    attributes:
+      - name: position-id
+        type: String
+        isPrimary: true
+      - name: amount-raw
+        type: BigInt
+    transitions:
+      - action: WITHDRAW
+        operatesOn: individual
+        requestFields:
+          - name: amount-raw
+            type: BigInt
+            isRequired: true
+        responseField:
+          name: position
+          type: Position
+""",
+        outputDirectory=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    bigAmount = 123456789012345678901234567
+    calls: dict[str, dict[str, object]] = {}
+    client = _client(calls=calls, returnValues={'withdraw_position_v1': _module('resources').PositionV1(positionId='p1', amountRaw=bigAmount)})
+    response = client.post('/positions/p1/withdraw', json={'amountRaw': str(bigAmount)})
+    assert calls['withdraw_position_v1'] == {'positionId': 'p1', 'amountRaw': bigAmount}
+    assert response.json() == {'position': {'positionId': 'p1', 'amountRaw': str(bigAmount)}}
+    client.post('/positions/p1/withdraw', json={'amountRaw': 5})
+    assert calls['withdraw_position_v1'] == {'positionId': 'p1', 'amountRaw': 5}
+    with pytest.raises(BadRequestException):
+        client.post('/positions/p1/withdraw', json={'amountRaw': 'lots'})
+    assert _module('resources').PositionV1.model_json_schema()['properties']['amountRaw'] == {'title': 'Amountraw', 'type': 'string'}
+
+
 def test_uuid_fields_parse_uuids_and_reject_other_strings(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _generate(
         specYaml="""
