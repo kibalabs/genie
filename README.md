@@ -54,7 +54,7 @@ resources:
 
 Fields use it like any other type (`type: ViewContent`, also inside `List` and `Mapping`). `python-server` generates a `ViewContentV1` pydantic discriminated union in `resources`; `typescript-client` generates a `ViewContentV1` union type and a `viewContentV1FromObject` function that builds the member class named by the discriminator (and throws for unknown values).
 
-`type: Uuid` is a string that must be a hyphenated UUID (any case). It works anywhere `String` does, including as a primary attribute in paths. `python-server` types it as kiba-core's `UuidString` (needs a kiba-core with `core.util.typing_util.UuidString`), keeping the value as sent and rejecting other strings with a 400; `typescript-client` types it as `string`.
+`type: Uuid` is a string that must be a valid UUID. It works anywhere `String` does, including as a primary attribute in paths. `python-server` types it as `uuid.UUID`, so pydantic rejects other strings with a 400, internal methods get `uuid.UUID` objects and responses write them in the standard lowercase hyphenated form; `typescript-client` types it as `string`.
 
 ## Rate limits
 

@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Added
 - [MINOR] Added rate limits: a top-level `rateLimits` list (`name`, any of `perMinute`, `perFiveMinutes`, `perHour` and `perDay`, and `keyBy: user | ip`), a `defaultRateLimit`, and `rateLimit` on transitions (`none` turns the default off). Transitions using a user-keyed limit must have authentication. `python-server` writes each one as a `RATE_LIMIT_<NAME>` `RateLimitConfig` and passes it to kiba-core's `route`, which rejects requests over the limit with a 429
-- [MINOR] Added the `Uuid` type: a string that must be a hyphenated UUID (any case), usable anywhere `String` is (including primary attributes in paths). `python-server` types it as kiba-core's `core.util.typing_util.UuidString`, which keeps the value as sent, so requests with other strings get a 400; `typescript-client` types it as `string`
+- [MINOR] Added the `Uuid` type: a string that must be a valid UUID, usable anywhere `String` is (including primary attributes in paths). `python-server` types it as `uuid.UUID`, so requests with other strings get a 400 and responses use the lowercase hyphenated form; `typescript-client` types it as `string`
 
 ### Changed
 - [MINOR] `defaultAuthentication` and `authentication` policy names can contain underscores (e.g. `resource_owner`)

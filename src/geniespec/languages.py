@@ -349,7 +349,7 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
         return 'str | None' if isNullable else 'str'
 
     def uuid_type(self, isNullable: bool) -> str:
-        return 'UuidString | None' if isNullable else 'UuidString'
+        return 'uuid.UUID | None' if isNullable else 'uuid.UUID'
 
     def enum_type(self, isNullable: bool, renderableType: RenderableType, apiVersion: Version, isLocalReference: bool) -> str:
         if renderableType.className is None:

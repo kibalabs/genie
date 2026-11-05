@@ -5,6 +5,9 @@ import collections.abc
 {% if target.operations_require_typing(api=api) %}
 import typing
 {% endif %}
+{% if target.requires_uuid(api=api) %}
+import uuid
+{% endif %}
 
 {% if target.operations_require_json(api=api) %}
 import pydantic
@@ -13,9 +16,6 @@ import pydantic
 from . import resources
 {% if target.requires_undefined(api=api) %}
 from core.util.typing_util import UNDEFINED, UpdateValue
-{% endif %}
-{% if target.requires_uuid(api=api) %}
-from core.util.typing_util import UuidString
 {% endif %}
 {% if target.requires_uploaded_file(api=api) %}
 from core.api.uploaded_file import UploadedFile

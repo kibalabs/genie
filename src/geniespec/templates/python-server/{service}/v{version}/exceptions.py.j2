@@ -2,14 +2,14 @@
 from __future__ import annotations
 import collections.abc
 import typing
+{% if target.requires_uuid(api=api) %}
+import uuid
+{% endif %}
 {% if target.exceptions_require_json(api=api) %}
 import pydantic
 {% endif %}
 from core import exceptions
 from core.util.typing_util import Json
-{% if target.requires_uuid(api=api) %}
-from core.util.typing_util import UuidString
-{% endif %}
 from . import resources
 
 
