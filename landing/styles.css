@@ -856,7 +856,7 @@ i.patch { color: var(--pink); }
 }
 
 .letter-sparkle {
-  transform-origin: 410px 142px;
+  transform-origin: 256px 256px;
   animation: twinkle 2.8s ease-in-out infinite;
 }
 
