@@ -163,21 +163,6 @@ const setupRouteTable = () => {
   }, 1400);
 };
 
-const setupDrift = () => {
-  const messy = Array.from(document.querySelectorAll('.drift-panel.messy li'));
-  const clean = Array.from(document.querySelectorAll('.drift-panel.clean li'));
-  if (prefersReducedMotion || messy.length === 0) {
-    return;
-  }
-  let index = 0;
-  setInterval(() => {
-    [...messy, ...clean].forEach((item) => item.classList.remove('lit'));
-    messy[index % messy.length].classList.add('lit');
-    clean[index % clean.length].classList.add('lit');
-    index += 1;
-  }, 1600);
-};
-
 const setupCardGlow = () => {
   document.querySelectorAll('.type-card, .principle').forEach((card) => {
     card.addEventListener('pointermove', (event) => {
@@ -294,7 +279,6 @@ runStars();
 setupReveal();
 setupExplorer();
 setupRouteTable();
-setupDrift();
 setupCardGlow();
 setupCopy();
 runHero();
