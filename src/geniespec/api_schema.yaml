@@ -49,7 +49,42 @@ properties:
       - "null"
       - string
     pattern: '^[a-z][a-z0-9-]*$'
+  rateLimits:
+    type: array
+    items:
+      $ref: '#/definitions/RateLimit'
+  defaultRateLimit:
+    type:
+      - "null"
+      - string
+    pattern: '^[a-z][a-z0-9-]*$'
 definitions:
+  RateLimit:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        pattern: '^[a-z][a-z0-9-]*$'
+      perMinute:
+        type: integer
+        minimum: 1
+      perFiveMinutes:
+        type: integer
+        minimum: 1
+      perHour:
+        type: integer
+        minimum: 1
+      perDay:
+        type: integer
+        minimum: 1
+      keyBy:
+        type: string
+        enum:
+          - user
+          - ip
   EnumValues:
     type: array
     minItems: 1
@@ -196,6 +231,11 @@ definitions:
           - "null"
           - string
         pattern: '^[a-z][a-z0-9-]*$'
+      rateLimit:
+        type:
+          - "null"
+          - string
+        pattern: '^[a-z][a-z0-9-]*$'
       responseType:
         type: string
         enum:
@@ -223,6 +263,11 @@ definitions:
       responseField:
         $ref: '#/definitions/ResponseField'
       authentication:
+        type:
+          - "null"
+          - string
+        pattern: '^[a-z][a-z0-9-]*$'
+      rateLimit:
         type:
           - "null"
           - string

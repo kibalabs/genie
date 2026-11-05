@@ -13,8 +13,10 @@ import pydantic
 import pytest
 import yaml  # type: ignore[import-untyped]
 from core.api.api_request import KibaApiRequest
+from core.api.middleware.origin_ip_middleware import OriginIpMiddleware
 from core.exceptions import BadRequestException
 from core.exceptions import FoundRedirectException
+from core.exceptions import TooManyRequestsException
 from core.util.typing_util import UNDEFINED
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
@@ -917,6 +919,40 @@ transitions:
         client.post('/upload-scan', files={'other': ('other.txt', b'other', 'text/plain')}, data={'pageCount': '3'})
 
 
+def test_rate_limits_apply_by_default_unless_a_transition_overrides_or_opts_out(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _generate(
+        specYaml="""
+rateLimits:
+  - name: two-per-minute
+    perMinute: 2
+    keyBy: ip
+  - name: three-per-minute
+    perMinute: 3
+    keyBy: ip
+defaultRateLimit: two-per-minute
+transitions:
+  - action: LIMITED-BY-DEFAULT
+  - action: LIMITED-BY-OVERRIDE
+    rateLimit: three-per-minute
+  - action: NOT-LIMITED
+    rateLimit: none
+""",
+        outputDirectory=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    client = TestClient(OriginIpMiddleware(app=_client(calls={}, returnValues={}).app))
+
+    def allowed_calls(path: str) -> int:
+        for callCount in range(5):
+            try:
+                client.post(path, json={})
+            except TooManyRequestsException:
+                return callCount
+        return 5
+
+    assert (allowed_calls('/limited-by-default'), allowed_calls('/limited-by-override'), allowed_calls('/not-limited')) == (2, 3, 5)
+
+
 @pytest.mark.parametrize(
     ('specYaml', 'expectedErrors'),
     [
@@ -1340,6 +1376,44 @@ resources:
                 'Content has more than one kind chart',
             ],
             id='invalid-one-of',
+        ),
+        pytest.param(
+            """
+rateLimits:
+  - name: standard
+    perMinute: 10
+  - name: standard
+    perHour: 100
+  - name: none
+    perMinute: 10
+  - name: empty
+""",
+            [
+                'Duplicate rate limit: standard',
+                'Rate limit none is reserved for transitions without a rate limit',
+                'Rate limit empty needs at least one of perMinute, perFiveMinutes, perHour or perDay',
+            ],
+            id='invalid-rate-limits',
+        ),
+        pytest.param(
+            """
+rateLimits:
+  - name: per-user
+    perMinute: 10
+transitions:
+  - action: PING
+    rateLimit: missing
+  - action: PONG
+    rateLimit: per-user
+  - action: PANG
+    authentication: member
+    rateLimit: per-user
+""",
+            [
+                'ping: unknown rate limit missing',
+                'pong: rate limit per-user is keyed by user, so the transition needs authentication',
+            ],
+            id='invalid-transition-rate-limits',
         ),
     ],
 )

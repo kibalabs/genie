@@ -212,6 +212,7 @@ class RenderableOperation(BaseModel):
     body: list[RenderableParameter] | None
     responseFields: list[RenderableField] | None
     authentication: str | None
+    rateLimit: str | None = None
     isIndirectAction: bool = False
     responseType: str = ResponseTypes.JSON
 
@@ -241,6 +242,15 @@ class RenderableException(BaseModel):
     fields: list[ExceptionRenderableField]
 
 
+class RenderableRateLimit(BaseModel):
+    name: RenderableString
+    perMinute: int | None
+    perFiveMinutes: int | None
+    perHour: int | None
+    perDay: int | None
+    keyBy: str
+
+
 class RenderableApi(BaseModel):
     version: Version
     serviceName: RenderableString
@@ -251,6 +261,7 @@ class RenderableApi(BaseModel):
     exceptions: list[RenderableException]
     enums: list[RenderableEnum] = []
     oneOfs: list[RenderableOneOf] = []
+    rateLimits: list[RenderableRateLimit] = []
 
 
 class ProcessableResource(BaseModel):

@@ -15,6 +15,7 @@ from geniespec.renderable_types import RenderableField
 from geniespec.renderable_types import RenderableOneOf
 from geniespec.renderable_types import RenderableOperation
 from geniespec.renderable_types import RenderableParameter
+from geniespec.renderable_types import RenderableRateLimit
 from geniespec.renderable_types import RenderableRawTypes
 from geniespec.renderable_types import RenderableResource
 from geniespec.renderable_types import RenderableString
@@ -369,6 +370,20 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
     @classmethod
     def requires_auth_resolver(cls, api: RenderableApi) -> bool:
         return any(cls.route_auth(operation=operation) is not None for operation in api.operations)
+
+    @staticmethod
+    def route_rate_limit(operation: RenderableOperation) -> str | None:
+        return operation.rateLimit if operation.rateLimit not in (None, 'none') else None
+
+    @staticmethod
+    def rate_limit_constant_name(name: str) -> str:
+        return f'RATE_LIMIT_{RenderableString.from_kebab_case_string(string=name).snakeCaseString.upper()}'
+
+    @staticmethod
+    def rate_limit_config(rateLimit: RenderableRateLimit) -> str:
+        windows = {'perMinute': rateLimit.perMinute, 'perFiveMinutes': rateLimit.perFiveMinutes, 'perHour': rateLimit.perHour, 'perDay': rateLimit.perDay}
+        entries = [f"'{window}': {limit}" for window, limit in windows.items() if limit is not None]
+        return '{' + ', '.join([*entries, f"'keyBy': '{rateLimit.keyBy}'"]) + '}'
 
     def operation_name(self, operation: RenderableOperation) -> str:
         return self.snake_name(name=self._operation_name(operation=operation))

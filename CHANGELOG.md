@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ## [Unreleased]
 
 ### Added
+- [MINOR] Added rate limits: a top-level `rateLimits` list (`name`, any of `perMinute`, `perFiveMinutes`, `perHour` and `perDay`, and `keyBy: user | ip`), a `defaultRateLimit`, and `rateLimit` on transitions (`none` turns the default off). Transitions using a user-keyed limit must have authentication. `python-server` writes each one as a `RATE_LIMIT_<NAME>` `RateLimitConfig` and passes it to kiba-core's `route`, which rejects requests over the limit with a 429
 
 ### Changed
 
