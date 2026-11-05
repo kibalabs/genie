@@ -21,7 +21,7 @@ repository = "https://github.com/kibalabs/genie"
 
 [dependency-groups]
 dev = [
-    "kiba-build==0.1.11.dev23",
+    "kiba-build==0.1.11.dev24",
     "kiba-core[core-api,requester]>=0.5.3.dev87,<0.5.4",
 ]
 
@@ -31,8 +31,3 @@ build-backend = "uv_build"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-
-# NOTE(krishan711): without this, bumping the version also rewrites dependency pins that contain it (e.g. 0.1.1 inside kiba-build==0.1.11.dev23)
-[tool.bumpversion]
-search = "version = \"{current_version}\""
-replace = "version = \"{new_version}\""
