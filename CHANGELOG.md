@@ -9,8 +9,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Added
 - [MINOR] Added rate limits: a top-level `rateLimits` list (`name`, any of `perMinute`, `perFiveMinutes`, `perHour` and `perDay`, and `keyBy: user | ip`), a `defaultRateLimit`, and `rateLimit` on transitions (`none` turns the default off). Transitions using a user-keyed limit must have authentication. `python-server` writes each one as a `RATE_LIMIT_<NAME>` `RateLimitConfig` and passes it to kiba-core's `route`, which rejects requests over the limit with a 429
+- [MINOR] Added the `Uuid` type: a string that must be a valid UUID, usable anywhere `String` is (including primary attributes in paths). `python-server` types it as a `UuidString` alias in `resources` that pydantic validates with `uuid.UUID` and keeps as sent, so requests with other strings get a 400; `typescript-client` types it as `string`
 
 ### Changed
+- [MINOR] `defaultAuthentication` and `authentication` policy names can contain underscores (e.g. `resource_owner`)
 
 ### Removed
 

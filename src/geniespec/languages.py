@@ -73,6 +73,9 @@ class BaseLanguageDefinition:
     def string_type(self, isNullable: bool) -> str:
         raise NotImplementedError
 
+    def uuid_type(self, isNullable: bool, isLocalReference: bool) -> str:
+        raise NotImplementedError
+
     def enum_type(self, isNullable: bool, renderableType: RenderableType, apiVersion: Version, isLocalReference: bool) -> str:
         raise NotImplementedError
 
@@ -110,6 +113,8 @@ class BaseLanguageDefinition:
             return self.double_type(isNullable=isNullable)
         if yamlType == PrimitiveTypes.STRING:
             return self.string_type(isNullable=isNullable)
+        if yamlType == PrimitiveTypes.UUID:
+            return self.uuid_type(isNullable=isNullable, isLocalReference=isLocalReference)
         if yamlType == PrimitiveTypes.BOOLEAN:
             return self.boolean_type(isNullable=isNullable)
         if yamlType == PrimitiveTypes.DATETIME:
@@ -227,9 +232,9 @@ class BaseLanguageDefinition:
                 return output
             if component.attribute.isUnique and not component.attribute.isPrimary:
                 output.append(self.kebab_name(name=component.attribute.name))
-            if component.attribute.fieldType.rawType not in (PrimitiveTypes.INTEGER, PrimitiveTypes.LONG_INTEGER, PrimitiveTypes.STRING):
-                raise KibaException(message=f'ResourceEndpointComponent created with an invalid attribute type of {component.attribute.fieldType}. Valid types are: integer, long integer and string.')
-            output.append(self.path_parameter_segment(parameterName=self.identifier(name=component.attribute.name), isInteger=component.attribute.fieldType.rawType != PrimitiveTypes.STRING))
+            if component.attribute.fieldType.rawType not in (PrimitiveTypes.INTEGER, PrimitiveTypes.LONG_INTEGER, PrimitiveTypes.STRING, PrimitiveTypes.UUID):
+                raise KibaException(message=f'ResourceEndpointComponent created with an invalid attribute type of {component.attribute.fieldType}. Valid types are: integer, long integer, string and uuid.')
+            output.append(self.path_parameter_segment(parameterName=self.identifier(name=component.attribute.name), isInteger=component.attribute.fieldType.rawType in (PrimitiveTypes.INTEGER, PrimitiveTypes.LONG_INTEGER)))
             return output
         raise KibaException(message=f'Unsupported endpoint component: {type(component)}')
 
@@ -343,6 +348,10 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
     def string_type(self, isNullable: bool) -> str:
         return 'str | None' if isNullable else 'str'
 
+    def uuid_type(self, isNullable: bool, isLocalReference: bool) -> str:
+        typeName = 'UuidString' if isLocalReference else 'resources.UuidString'
+        return f'{typeName} | None' if isNullable else typeName
+
     def enum_type(self, isNullable: bool, renderableType: RenderableType, apiVersion: Version, isLocalReference: bool) -> str:
         if renderableType.className is None:
             typeName = self.enum_literal(values=renderableType.enumValues)
@@ -423,11 +432,23 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
             return PythonLanguageDefinition._contains_json(renderableType=renderableType.keyType) or PythonLanguageDefinition._contains_json(renderableType=renderableType.valueType)
         return renderableType.rawType == PrimitiveTypes.JSON
 
+    @staticmethod
+    def _contains_uuid(renderableType: RenderableType) -> bool:
+        if isinstance(renderableType, MappingRenderableType):
+            return PythonLanguageDefinition._contains_uuid(renderableType=renderableType.keyType) or PythonLanguageDefinition._contains_uuid(renderableType=renderableType.valueType)
+        return renderableType.rawType == PrimitiveTypes.UUID
+
+    def requires_uuid(self, api: RenderableApi) -> bool:
+        fieldTypes = [attribute.fieldType for resource in api.resources for attribute in [*resource.attributes, *resource.independentAttributes]]
+        fieldTypes += [parameter.fieldType for operation in api.operations for parameter in operation.parameters] + [field.fieldType for operation in api.operations for field in operation.responseFields or []]
+        fieldTypes += [field.fieldType for exception in api.exceptions for field in exception.fields]
+        return any(self._contains_uuid(renderableType=fieldType) for fieldType in fieldTypes)
+
     def resources_require_json(self, api: RenderableApi) -> bool:
         return any(self._contains_json(renderableType=attribute.fieldType) for resource in api.resources for attribute in resource.attributes)
 
     def resources_require_typing(self, api: RenderableApi) -> bool:
-        return len(api.enums) > 0 or len(api.oneOfs) > 0 or any(self.is_inline_enum(renderableType=attribute.fieldType) for resource in api.resources for attribute in resource.attributes)
+        return len(api.enums) > 0 or len(api.oneOfs) > 0 or self.requires_uuid(api=api) or any(self.is_inline_enum(renderableType=attribute.fieldType) for resource in api.resources for attribute in resource.attributes)
 
     def one_of_alias(self, oneOf: RenderableOneOf, apiVersion: Version) -> str:
         return f'typing.Annotated[{" | ".join(self.one_of_member_class_names(oneOf=oneOf, apiVersion=apiVersion))}, pydantic.Field(discriminator={self.identifier(name=oneOf.discriminator)!r})]'
@@ -562,6 +583,9 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
     def string_type(self, isNullable: bool) -> str:
         return self._nullable(typeName='string', isNullable=isNullable)
 
+    def uuid_type(self, isNullable: bool, isLocalReference: bool) -> str:  # noqa: ARG002
+        return self._nullable(typeName='string', isNullable=isNullable)
+
     def enum_type(self, isNullable: bool, renderableType: RenderableType, apiVersion: Version, isLocalReference: bool) -> str:
         if renderableType.className is None:
             return self._nullable(typeName=f'({self.enum_union(values=renderableType.enumValues)})', isNullable=isNullable)
@@ -680,7 +704,7 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
             return f'{parserName if isLocalReference else f"Resources.{parserName}"}({value} as RawObject)'
         if renderableType.rawType == 'class' and renderableType.className is not None:
             return f'{self.type(renderableType=renderableType, apiVersion=apiVersion, isLocalReference=isLocalReference)}.fromObject({value} as RawObject)'
-        if renderableType.rawType == PrimitiveTypes.STRING:
+        if renderableType.rawType in (PrimitiveTypes.STRING, PrimitiveTypes.UUID):
             return f'String({value})'
         if renderableType.rawType in (PrimitiveTypes.INTEGER, PrimitiveTypes.LONG_INTEGER, PrimitiveTypes.FLOAT, PrimitiveTypes.DOUBLE):
             return f'Number({value})'

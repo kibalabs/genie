@@ -953,6 +953,65 @@ transitions:
     assert (allowed_calls('/limited-by-default'), allowed_calls('/limited-by-override'), allowed_calls('/not-limited')) == (2, 3, 5)
 
 
+def test_uuid_fields_keep_valid_uuids_as_given_and_reject_other_strings(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _generate(
+        specYaml="""
+resources:
+  - singleName: Member
+    collectionName: Members
+    attributes:
+      - name: member-id
+        type: Uuid
+        isPrimary: true
+      - name: friend-ids
+        type: List
+        listValueTypes: [Uuid]
+    transitions:
+      - action: GET
+      - action: INVITE
+        operatesOn: individual
+        requestFields:
+          - name: invitee-id
+            type: Uuid
+            isRequired: true
+""",
+        outputDirectory=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    memberId = 'A0B1C2D3-E4F5-4A6B-8C7D-0E1F2A3B4C5D'
+    friendId = '0e1f2a3b-4c5d-4e6f-8a7b-9c0d1e2f3a4b'
+    calls: dict[str, dict[str, object]] = {}
+    client = _client(calls=calls, returnValues={'get_member_v1': {'memberId': memberId, 'friendIds': [friendId]}})
+    assert client.get(f'/members/{memberId}').json() == {'member': {'memberId': memberId, 'friendIds': [friendId]}}
+    client.post(f'/members/{memberId}/invite', json={'inviteeId': friendId})
+    assert calls['invite_member_v1'] == {'memberId': memberId, 'inviteeId': friendId}
+    with pytest.raises(BadRequestException):
+        client.get('/members/not-a-uuid')
+    with pytest.raises(BadRequestException):
+        client.post(f'/members/{memberId}/invite', json={'inviteeId': 'not-a-uuid'})
+    with pytest.raises(pydantic.ValidationError):
+        _module('resources').MemberV1(memberId=memberId, friendIds=['not-a-uuid'])
+
+
+def test_authentication_policies_can_use_underscores(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _generate(
+        specYaml="""
+defaultAuthentication: resource_owner
+transitions:
+  - action: PING
+  - action: PONG
+    authentication: admin_user
+""",
+        outputDirectory=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    authResolver = _AuthResolver()
+    client = _client(calls={}, returnValues={}, authResolver=authResolver)
+    client.post('/ping', json={})
+    client.post('/pong', json={})
+    assert authResolver.policies == ['resource_owner', 'admin_user']
+
+
 @pytest.mark.parametrize(
     ('specYaml', 'expectedErrors'),
     [
