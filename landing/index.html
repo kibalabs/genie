@@ -9,6 +9,7 @@
   <meta property="og:description" content="Describe resources, their hierarchy and a few standard methods in one api.yaml. Genie checks the design and generates the server and the clients." />
   <meta name="theme-color" content="#07060f" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/assets/icon-dark.png" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -17,18 +18,7 @@
 
   <header class="nav">
     <a class="brand" href="#top" aria-label="Genie home">
-      <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
-        <defs>
-          <linearGradient id="lamp" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#b48cff" />
-            <stop offset="1" stop-color="#39e0c8" />
-          </linearGradient>
-        </defs>
-        <path d="M10 42c6 6 30 6 40 0l6-10h-8c-2-6-8-9-16-9s-14 3-16 9h-2c-4 0-6 3-4 6z" fill="url(#lamp)" />
-        <path d="M30 23c-2-6 4-8 2-14 6 4 6 10 2 14z" fill="#39e0c8" opacity=".8" />
-        <rect x="18" y="46" width="28" height="5" rx="2.5" fill="url(#lamp)" />
-      </svg>
-      <span>genie</span>
+      <img class="brand-wordmark" src="/assets/wordmark-noback-dark.svg" alt="genie" width="113" height="32" />
     </a>
     <nav class="nav-links" aria-label="Sections">
       <a href="#why">Why</a>
@@ -81,10 +71,18 @@
 
     <section id="why" class="section letter-section">
       <article class="letter reveal">
-        <svg class="letter-mark" viewBox="0 0 64 64" width="56" height="56" aria-hidden="true">
-          <path d="M10 42c6 6 30 6 40 0l6-10h-8c-2-6-8-9-16-9s-14 3-16 9h-2c-4 0-6 3-4 6z" fill="url(#lamp)" />
-          <path class="letter-wisp" d="M30 23c-2-6 4-8 2-14 6 4 6 10 2 14z" fill="#39e0c8" />
-          <rect x="18" y="46" width="28" height="5" rx="2.5" fill="url(#lamp)" />
+        <svg class="letter-mark" viewBox="40 21 448 448" width="64" height="64" aria-hidden="true">
+          <defs>
+            <linearGradient id="letter-mark-gradient" x1="40" y1="440" x2="470" y2="80" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#9d6bff" />
+              <stop offset="1" stop-color="#2fd9c0" />
+            </linearGradient>
+          </defs>
+          <g fill="url(#letter-mark-gradient)" stroke="url(#letter-mark-gradient)" stroke-linejoin="round">
+            <path stroke-width="20" d="M56 286 C56 362 120 410 206 410 C276 410 322 380 352 342 L466 236 L330 286 Z" />
+            <path stroke-width="14" d="M104 262 A92 76 0 0 1 288 262 Z" />
+          </g>
+          <path class="letter-sparkle" fill="url(#letter-mark-gradient)" d="M410 70 C416 120 432 136 482 142 C432 148 416 164 410 214 C404 164 388 148 338 142 C388 136 404 120 410 70 Z" />
         </svg>
         <p>Hi, I'm Krishan.</p>
         <p>I've worked at a lot of companies, and I've built thousands of APIs. Back then we wrote every one of them by hand.</p>

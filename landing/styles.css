@@ -84,18 +84,12 @@ code {
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-family: var(--mono);
-  font-weight: 700;
-  font-size: 20px;
-  text-decoration: none;
-  letter-spacing: -0.02em;
 }
 
-.brand-mark {
-  width: 34px;
-  height: 34px;
-  filter: drop-shadow(0 0 10px rgba(180, 140, 255, 0.6));
+.brand-wordmark {
+  display: block;
+  height: 32px;
+  width: auto;
 }
 
 .nav-links {
@@ -855,15 +849,15 @@ i.patch { color: var(--pink); }
 
 .letter-mark {
   display: block;
-  width: 56px;
-  height: 56px;
+  width: 64px;
+  height: 64px;
   margin: 0 auto 44px;
   animation: float 5s ease-in-out infinite;
 }
 
-.letter-wisp {
-  transform-origin: 32px 23px;
-  animation: wisp 2.6s ease-in-out infinite;
+.letter-sparkle {
+  transform-origin: 410px 142px;
+  animation: twinkle 2.8s ease-in-out infinite;
 }
 
 .letter p {
@@ -928,9 +922,9 @@ i.patch { color: var(--pink); }
   50% { transform: translateY(-6px); }
 }
 
-@keyframes wisp {
-  0%, 100% { transform: scaleY(1); opacity: 0.8; }
-  50% { transform: scaleY(1.15); opacity: 1; }
+@keyframes twinkle {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.85; }
+  50% { transform: scale(1.18) rotate(12deg); opacity: 1; }
 }
 
 .principle-grid {
