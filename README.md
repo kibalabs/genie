@@ -103,11 +103,11 @@ resources:
         extensions: {deprecated: true}
 ```
 
-`python-server` passes the transition fields to kiba-core's `route`, whose `OpenApiSchemaGenerator` documents every route with an `operationId` (and skips the rest); `extensions` reach `OpenApiExtension`s as `metadata['extensions']`. Field descriptions become pydantic `Field(description=...)`, so they show up in the request and response schemas. Each `operationId` must be unique, so a transition that generates more than one route (for example `GET` on a resource with unique attributes) can't set one. `typescript-client` ignores these fields.
+`python-server` passes the transition fields to kiba-core's `route`, whose `OpenApiSchemaGenerator` documents every route with an `operationId` (and skips the rest); `extensions` reach `OpenApiExtension`s as `metadata['extensions']`. Field descriptions become pydantic `Field(description=...)`, so they show up in the request and response schemas. Each `operationId` must be unique, so a transition that generates more than one route (for example a `GET` on a resource that is also `accessibleFrom` root) can't set one. `typescript-client` ignores these fields.
 
 ## Unique attributes
 
-Resources are addressed by their primary attribute. A `GET` transition also adds a lookup for each `isUnique` attribute (`/assets/address/{address}`), and, on a child resource, for each `isUniqueInParent` attribute: one that is only unique within its parent, like an asset's address on a chain. Those lookups only exist through the parent (`/chains/{chainId}/assets/address/{address}`), never from root or another ancestor.
+Resources are addressed by their primary attribute. A `GET` transition also adds a lookup for each `isUnique` attribute (`/assets/address/{address}`), and, on a child resource, for each `isUniqueInParent` attribute: one that is only unique within its parent, like an asset's address on a chain. Those lookups only exist through the parent (`/chains/{chainId}/assets/address/{address}`), never from root or another ancestor. Lookups share the `GET` transition's documentation fields, with `By<Attribute>` added to its `operationId` (`getAsset` → `getAssetByAddress`).
 
 ## Overrides
 
