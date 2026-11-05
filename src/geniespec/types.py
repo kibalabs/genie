@@ -30,6 +30,20 @@ class ResponseTypes:
     REDIRECT = 'redirect'
 
 
+class RateLimitKeys:
+    USER = 'user'
+    IP = 'ip'
+
+
+class ApiRateLimit(BaseModel):
+    name: str
+    perMinute: int | None = None
+    perFiveMinutes: int | None = None
+    perHour: int | None = None
+    perDay: int | None = None
+    keyBy: str = RateLimitKeys.USER
+
+
 class ComplexTypes:
     MAPPING = 'Mapping'
     ALL: ClassVar[list[str]] = [MAPPING]
@@ -104,6 +118,7 @@ class BaseTransition(BaseModel):
     responseField: ResponseField | None = None
     requestFields: list[RequestField] = []
     authentication: str | None = None
+    rateLimit: str | None = None
     responseType: str = ResponseTypes.JSON
 
 
@@ -163,6 +178,8 @@ class KibaApi(BaseModel):
     enums: list[ApiEnum] = []
     oneOfs: list[ApiOneOf] = []
     defaultAuthentication: str | None = None
+    rateLimits: list[ApiRateLimit] = []
+    defaultRateLimit: str | None = None
 
     @property
     def versionObject(self) -> Version:  # noqa: N802

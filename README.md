@@ -54,6 +54,29 @@ resources:
 
 Fields use it like any other type (`type: ViewContent`, also inside `List` and `Mapping`). `python-server` generates a `ViewContentV1` pydantic discriminated union in `resources`; `typescript-client` generates a `ViewContentV1` union type and a `viewContentV1FromObject` function that builds the member class named by the discriminator (and throws for unknown values).
 
+## Rate limits
+
+Name rate limits at the top level, then pick one per transition with `rateLimit`. `defaultRateLimit` applies to every transition that doesn't set one, and `rateLimit: none` turns it off for a transition, the same way `defaultAuthentication` and `authentication` work:
+
+```yaml
+rateLimits:
+  - name: standard-read
+    perMinute: 30
+    perHour: 300
+  - name: public-read
+    perMinute: 30
+    perHour: 300
+    keyBy: ip
+defaultRateLimit: standard-read
+transitions:
+  - action: GET-HEALTH
+    method: GET
+    authentication: none
+    rateLimit: public-read
+```
+
+A rate limit needs at least one of `perMinute`, `perFiveMinutes`, `perHour` and `perDay`. `keyBy` is `user` (the default) or `ip`. Requests over any window are rejected with a 429. Limits keyed by `user` count per authenticated user, so a transition using one needs `authentication`. `python-server` writes each rate limit as a `RATE_LIMIT_<NAME>` kiba-core `RateLimitConfig` and passes it to `route`; keying by `ip` needs kiba-core's `OriginIpMiddleware`. `typescript-client` ignores rate limits.
+
 # Development
 
 ```

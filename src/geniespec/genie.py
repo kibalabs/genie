@@ -32,6 +32,7 @@ from geniespec.renderable_types import RenderableOneOf
 from geniespec.renderable_types import RenderableOneOfMember
 from geniespec.renderable_types import RenderableOperation
 from geniespec.renderable_types import RenderableParameter
+from geniespec.renderable_types import RenderableRateLimit
 from geniespec.renderable_types import RenderableRawTypes
 from geniespec.renderable_types import RenderableResource
 from geniespec.renderable_types import RenderableString
@@ -46,6 +47,7 @@ from geniespec.types import ComplexTypes
 from geniespec.types import FieldSources
 from geniespec.types import KibaApi
 from geniespec.types import PrimitiveTypes
+from geniespec.types import RateLimitKeys
 from geniespec.types import RequestField
 from geniespec.types import Resource
 from geniespec.types import ResponseField
@@ -114,7 +116,7 @@ class Renderer:
         method = transition.method or defaultMethods.get(transition.action.upper(), 'POST')
         return RenderableMethod(method=RenderableString.from_upper_case_string(string=method))
 
-    def _action_operation(self, transition: BaseTransition, endpoint: RenderableEndpoint, knownTypeNames: dict[str, str], defaultAuthentication: str | None, isIndirectAction: bool = False) -> RenderableOperation:
+    def _action_operation(self, transition: BaseTransition, endpoint: RenderableEndpoint, knownTypeNames: dict[str, str], defaultAuthentication: str | None, defaultRateLimit: str | None, isIndirectAction: bool = False) -> RenderableOperation:
         method = self._transition_to_renderable_method(transition=transition)
         fields = [self._request_field_to_renderable_parameter(requestField=requestField, knownTypeNames=knownTypeNames) for requestField in transition.requestFields]
         isQuery = method.method.upperCaseString == 'GET'
@@ -125,6 +127,7 @@ class Renderer:
             body=None if isQuery else fields,
             responseFields=[self._response_field_to_renderable_field(responseField=transition.responseField, knownTypeNames=knownTypeNames)] if transition.responseField is not None else None,
             authentication=transition.authentication or defaultAuthentication,
+            rateLimit=transition.rateLimit or defaultRateLimit,
             isIndirectAction=isIndirectAction,
             responseType=transition.responseType,
         )
@@ -344,7 +347,7 @@ class Renderer:
     def _is_string_mapping(renderableType: RenderableType) -> bool:
         return isinstance(renderableType, MappingRenderableType) and renderableType.keyType.rawType == PrimitiveTypes.STRING and renderableType.valueType.rawType == PrimitiveTypes.STRING
 
-    def _operation_errors(self, operation: RenderableOperation) -> list[str]:
+    def _operation_errors(self, operation: RenderableOperation, rateLimitsByName: dict[str, RenderableRateLimit]) -> list[str]:
         lastComponent = operation.endpoint.components[-1] if operation.endpoint.components else None
         name = lastComponent.actionName.kebabCaseString if isinstance(lastComponent, ActionEndpointComponent) and lastComponent.actionName is not None else operation.method.method.upperCaseString
         parametersBySource: dict[str, list[RenderableParameter]] = collections.defaultdict(list)
@@ -369,6 +372,12 @@ class Renderer:
                 for parameter in operation.parameters
                 if parameter.source == FieldSources.REQUEST and (parameter.fieldType.isList or isinstance(parameter.fieldType, MappingRenderableType) or parameter.fieldType.rawType not in FORM_FIELD_RAW_TYPES)
             ]
+        if operation.rateLimit not in (None, 'none'):
+            rateLimit = rateLimitsByName.get(operation.rateLimit)
+            if rateLimit is None:
+                errors.append(f'{name}: unknown rate limit {operation.rateLimit}')
+            elif rateLimit.keyBy == RateLimitKeys.USER and operation.authentication in (None, 'none'):
+                errors.append(f'{name}: rate limit {operation.rateLimit} is keyed by user, so the transition needs authentication')
         return errors
 
     @staticmethod
@@ -414,6 +423,9 @@ class Renderer:
         }
         resourceErrors = [f'Duplicate type name: {name}' for name, count in collections.Counter(fullResourceNames + enumNames + oneOfNames).items() if count > 1]
         resourceErrors += [f'Unknown parent resource {resource.parentResource} for {resource.singleName}' for resource in api.resources if resource.parentResource is not None and resource.parentResource not in fullResourceNames]
+        resourceErrors += [f'Duplicate rate limit: {name}' for name, count in collections.Counter(rateLimit.name for rateLimit in api.rateLimits).items() if count > 1]
+        resourceErrors += ['Rate limit none is reserved for transitions without a rate limit' for rateLimit in api.rateLimits if rateLimit.name == 'none']
+        resourceErrors += [f'Rate limit {rateLimit.name} needs at least one of perMinute, perFiveMinutes, perHour or perDay' for rateLimit in api.rateLimits if all(window is None for window in (rateLimit.perMinute, rateLimit.perFiveMinutes, rateLimit.perHour, rateLimit.perDay))]
         resourcesByName = dict(zip(fullResourceNames, api.resources, strict=False))
         renderableOneOfs: list[RenderableOneOf] = []
         for oneOf in api.oneOfs:
@@ -445,6 +457,7 @@ class Renderer:
                 endpoint=RenderableEndpoint(components=[ActionEndpointComponent(actionName=RenderableString.from_separated_string(string=transition.action, separator='-'))]),
                 knownTypeNames=knownTypeNames,
                 defaultAuthentication=api.defaultAuthentication,
+                defaultRateLimit=api.defaultRateLimit,
             )
             for transition in api.transitions
         ]
@@ -475,6 +488,10 @@ class Renderer:
             exceptions=renderableExceptions,
             enums=[RenderableEnum(name=RenderableString.from_pascal_case_string(string=enum.name), values=enum.values) for enum in api.enums],
             oneOfs=renderableOneOfs,
+            rateLimits=[
+                RenderableRateLimit(name=RenderableString.from_kebab_case_string(string=rateLimit.name), perMinute=rateLimit.perMinute, perFiveMinutes=rateLimit.perFiveMinutes, perHour=rateLimit.perHour, perDay=rateLimit.perDay, keyBy=rateLimit.keyBy)
+                for rateLimit in api.rateLimits
+            ],
         )
         renderableResources: list[RenderableResource] = [self._resource_to_renderable_resource(resource=resource, knownTypeNames=knownTypeNames) for resource in api.resources]
         uncoveredTransitions: list[str] = []
@@ -482,6 +499,8 @@ class Renderer:
             processableResource = self._get_processable_resource(renderableResource=renderableResource, allResources=renderableResources, knownTypeNames=knownTypeNames)
             endpoints = self._get_resource_endpoints(processableResource=processableResource)
             for transition in resource.transitions:
+                authentication = transition.authentication or api.defaultAuthentication
+                rateLimit = transition.rateLimit or api.defaultRateLimit
                 operationCount = len(renderableApi.operations)
                 method: RenderableMethod = self._transition_to_renderable_method(transition=transition)
                 if transition.isIndirectAction and transition.action.upper() in {'DELETE', 'CREATE', 'UPDATE', 'GET', 'LIST'}:
@@ -490,7 +509,7 @@ class Renderer:
                     raise SemanticValidationException(message=f'Only custom transitions can set a responseType: {transition.action}')
                 if transition.action.upper() == 'DELETE':
                     for endpoint in endpoints.individualEndpoints:
-                        renderableApi.operations.append(RenderableOperation(method=method, endpoint=endpoint, query=None, body=None, responseFields=[], authentication=transition.authentication or api.defaultAuthentication))
+                        renderableApi.operations.append(RenderableOperation(method=method, endpoint=endpoint, query=None, body=None, responseFields=[], authentication=authentication, rateLimit=rateLimit))
                 elif transition.action.upper() == 'CREATE':
                     parentResource = processableResource.parent.processableResource if processableResource.parent is not None else None
                     isOneToOne = (processableResource.renderableResource.primaryAttribute == parentResource.renderableResource.primaryAttribute) if parentResource is not None else False
@@ -502,17 +521,17 @@ class Renderer:
                     body += [self._request_field_to_renderable_parameter(requestField=requestField, knownTypeNames=knownTypeNames) for requestField in transition.requestFields]
                     returnValue = RenderableField(name=processableResource.renderableResource.singleName, fieldType=RenderableType(rawType='class', className=processableResource.renderableResource.singleName, isNullable=False, isList=False))
                     for endpoint in endpoints.collectionEndpoints:
-                        renderableApi.operations.append(RenderableOperation(method=method, endpoint=endpoint, query=None, body=body or None, responseFields=[returnValue], authentication=transition.authentication or api.defaultAuthentication))
+                        renderableApi.operations.append(RenderableOperation(method=method, endpoint=endpoint, query=None, body=body or None, responseFields=[returnValue], authentication=authentication, rateLimit=rateLimit))
                 elif transition.action.upper() == 'UPDATE':
                     returnValue = RenderableField(name=processableResource.renderableResource.singleName, fieldType=RenderableType(rawType='class', className=processableResource.renderableResource.singleName, isNullable=False, isList=False))
                     body = [self._attribute_to_renderable_parameter(attribute=attribute, isRequired=False, knownTypeNames=knownTypeNames, shouldUseDefault=False) for attribute in resource.attributes if attribute.isUpdatable]
                     body += [self._request_field_to_renderable_parameter(requestField=requestField, knownTypeNames=knownTypeNames) for requestField in transition.requestFields]
                     for endpoint in endpoints.individualEndpoints:
-                        renderableApi.operations.append(RenderableOperation(method=method, endpoint=endpoint, query=None, body=body or None, responseFields=[returnValue], authentication=transition.authentication or api.defaultAuthentication))
+                        renderableApi.operations.append(RenderableOperation(method=method, endpoint=endpoint, query=None, body=body or None, responseFields=[returnValue], authentication=authentication, rateLimit=rateLimit))
                 elif transition.action.upper() == 'GET':
                     returnValue = RenderableField(name=processableResource.renderableResource.singleName, fieldType=RenderableType(rawType='class', className=processableResource.renderableResource.singleName, isNullable=False, isList=False))
                     for endpoint in endpoints.individualEndpoints:
-                        renderableApi.operations.append(RenderableOperation(method=method, endpoint=endpoint, query=None, body=None, responseFields=[returnValue], authentication=transition.authentication or api.defaultAuthentication))
+                        renderableApi.operations.append(RenderableOperation(method=method, endpoint=endpoint, query=None, body=None, responseFields=[returnValue], authentication=authentication, rateLimit=rateLimit))
                     endpointsAccessibleWithUnique = [endpoint for endpoint in endpoints.collectionEndpoints if isinstance(endpoint.components[-1], ResourceEndpointComponent)]
                     uniqueAttributes = [attribute for attribute in resource.attributes if attribute.isUnique and not attribute.isPrimary and not attribute.shouldDisableGetEndpoint and not attribute.isAccessibleIndependently]
                     for endpoint in endpointsAccessibleWithUnique:
@@ -529,12 +548,12 @@ class Renderer:
                                     ),
                                 ]
                             )
-                            renderableApi.operations.append(RenderableOperation(method=method, endpoint=getByUniqueEndpoint, query=None, body=None, responseFields=[returnValue], authentication=transition.authentication or api.defaultAuthentication))
+                            renderableApi.operations.append(RenderableOperation(method=method, endpoint=getByUniqueEndpoint, query=None, body=None, responseFields=[returnValue], authentication=authentication, rateLimit=rateLimit))
                 elif transition.action.upper() == 'LIST':
                     returnValue = RenderableField(name=processableResource.renderableResource.collectionName, fieldType=RenderableType(rawType='class', className=processableResource.renderableResource.singleName, isNullable=False, isList=True))
                     query = [self._request_field_to_renderable_parameter(requestField=requestField, knownTypeNames=knownTypeNames) for requestField in transition.requestFields]
                     for endpoint in endpoints.collectionEndpoints:
-                        renderableApi.operations.append(RenderableOperation(method=method, endpoint=endpoint, query=query or None, body=None, responseFields=[returnValue], authentication=transition.authentication or api.defaultAuthentication))
+                        renderableApi.operations.append(RenderableOperation(method=method, endpoint=endpoint, query=query or None, body=None, responseFields=[returnValue], authentication=authentication, rateLimit=rateLimit))
                 else:  # Else it's a custom action
                     if transition.operatesOn == 'individual':
                         customEndpoints = endpoints.individualEndpoints
@@ -544,14 +563,15 @@ class Renderer:
                         raise KibaException(message=f'Resource {processableResource.renderableResource.singleName.pascalCaseString} has custom transition with invalid operatesOn field: {transition.operatesOn}')
                     for endpoint in customEndpoints:
                         customEndpoint = RenderableEndpoint(components=[*endpoint.components, ActionEndpointComponent(actionName=RenderableString.from_separated_string(string=transition.action, separator='-'))])
-                        renderableApi.operations.append(self._action_operation(transition=transition, endpoint=customEndpoint, knownTypeNames=knownTypeNames, defaultAuthentication=api.defaultAuthentication, isIndirectAction=transition.isIndirectAction))
+                        renderableApi.operations.append(self._action_operation(transition=transition, endpoint=customEndpoint, knownTypeNames=knownTypeNames, defaultAuthentication=api.defaultAuthentication, defaultRateLimit=api.defaultRateLimit, isIndirectAction=transition.isIndirectAction))
                 if len(renderableApi.operations) == operationCount:
                     uncoveredTransitions.append(f'{renderableResource.singleName.pascalCaseString} {transition.action}')
         if uncoveredTransitions:
             raise SemanticValidationException(
                 message=f'Transitions with no endpoint: {", ".join(uncoveredTransitions)}. Item transitions need a primary attribute, collection transitions need direct access or a parent resource, and CREATE is not supported on one-to-one child resources.'
             )
-        operationErrors = [error for operation in renderableApi.operations for error in self._operation_errors(operation=operation)]
+        rateLimitsByName = {rateLimit.name.kebabCaseString: rateLimit for rateLimit in renderableApi.rateLimits}
+        operationErrors = [error for operation in renderableApi.operations for error in self._operation_errors(operation=operation, rateLimitsByName=rateLimitsByName)]
         operationErrors += self._file_errors(resources=renderableResources, exceptions=renderableExceptions)
         if operationErrors:
             raise SemanticValidationException(message='\n'.join(operationErrors))
