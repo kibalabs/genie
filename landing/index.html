@@ -57,7 +57,7 @@
         </div>
       </div>
 
-      <div class="hero-stage reveal" aria-label="An api.yaml being turned into Python and TypeScript">
+      <div class="hero-stage reveal" role="figure" aria-label="An api.yaml being turned into Python and TypeScript">
         <div class="window spec-window">
           <div class="window-bar"><span></span><span></span><span></span><em>api.yaml</em></div>
           <pre class="code" id="hero-spec"></pre>
@@ -221,12 +221,12 @@
       </div>
       <div class="explorer reveal">
         <div class="tabs" role="tablist" aria-label="Generated files">
-          <button role="tab" class="tab" aria-selected="true" data-file="api-yaml" data-lang="yaml">api.yaml</button>
-          <button role="tab" class="tab" aria-selected="false" data-file="resources-py" data-lang="python">resources.py</button>
-          <button role="tab" class="tab" aria-selected="false" data-file="internal-py" data-lang="python">internal.py</button>
-          <button role="tab" class="tab" aria-selected="false" data-file="api-py" data-lang="python">api.py</button>
-          <button role="tab" class="tab" aria-selected="false" data-file="client-ts" data-lang="typescript">client.ts</button>
-          <button role="tab" class="tab" aria-selected="false" data-file="tree" data-lang="tree">output tree</button>
+          <button type="button" role="tab" class="tab" aria-selected="true" data-file="api-yaml" data-lang="yaml">api.yaml</button>
+          <button type="button" role="tab" class="tab" aria-selected="false" data-file="resources-py" data-lang="python">resources.py</button>
+          <button type="button" role="tab" class="tab" aria-selected="false" data-file="internal-py" data-lang="python">internal.py</button>
+          <button type="button" role="tab" class="tab" aria-selected="false" data-file="api-py" data-lang="python">api.py</button>
+          <button type="button" role="tab" class="tab" aria-selected="false" data-file="client-ts" data-lang="typescript">client.ts</button>
+          <button type="button" role="tab" class="tab" aria-selected="false" data-file="tree" data-lang="tree">output tree</button>
         </div>
         <div class="explorer-body">
           <pre class="code" id="explorer-code" role="tabpanel"></pre>
@@ -240,7 +240,7 @@
         <h2>Any language. Two are live today.</h2>
         <p>The spec says nothing about Python or TypeScript. Genie's core validates it and works out every resource, route, method name and type. A target then renders that model, and a target is only a language definition (type names, casing, reserved names) plus a folder of Jinja templates.</p>
       </div>
-      <div class="target-flow reveal" aria-label="api.yaml flows through the core into each target">
+      <div class="target-flow reveal" role="figure" aria-label="api.yaml flows through the core into each target">
         <div class="flow-node"><b>api.yaml</b><small>resources · methods · types</small></div>
         <div class="flow-link" aria-hidden="true"><span></span></div>
         <div class="flow-node core"><b>core</b><small>validate · routes · names · types</small></div>
@@ -331,11 +331,11 @@
         <h2>Edit the spec while the app is running</h2>
         <p><code>geniespec watch</code> builds once, starts your command, rebuilds on every save and passes your command's exit code through. If the spec is invalid it keeps the last good output.</p>
       </div>
-      <div class="terminal reveal" aria-label="Animated terminal showing geniespec watch">
+      <div class="terminal reveal" role="figure" aria-label="Animated terminal showing geniespec watch">
         <div class="window-bar"><span></span><span></span><span></span><em>zsh</em></div>
         <pre id="watch-terminal"></pre>
       </div>
-      <div class="error-wall reveal" aria-label="Examples of validation errors">
+      <div class="error-wall reveal" role="figure" aria-label="Examples of validation errors">
         <p class="error-title">Errors name the spec field that caused them:</p>
         <ul>
           <li><span>SemanticValidationException</span> Primary attribute of Book must be book-id, found id</li>
