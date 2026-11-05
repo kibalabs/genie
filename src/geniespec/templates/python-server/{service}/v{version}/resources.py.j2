@@ -6,25 +6,15 @@ import datetime
 {% if target.resources_require_typing(api=api) %}
 import typing
 {% endif %}
-{% if target.requires_uuid(api=api) %}
-import uuid
-{% endif %}
 
-{% if target.resources_require_json(api=api) or api.oneOfs or target.requires_uuid(api=api) %}
+{% if target.resources_require_json(api=api) or api.oneOfs %}
 import pydantic
 {% endif %}
 from pydantic import BaseModel
-
 {% if target.requires_uuid(api=api) %}
-
-def _validate_uuid(value: str) -> str:
-    uuid.UUID(value)
-    return value
-
-
-UuidString = typing.Annotated[str, pydantic.AfterValidator(_validate_uuid)]
-
+from core.util.typing_util import UuidString
 {% endif %}
+
 {% for enum in api.enums %}
 {{ target.enum_class_name(enum=enum, apiVersion=api.version) }} = {{ target.enum_literal(values=enum.values) }}
 {% if loop.last %}

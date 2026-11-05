@@ -16,6 +16,9 @@ from pydantic import BaseModel
 {% if target.requires_undefined(api=api) %}
 from core.util.typing_util import UNDEFINED, UpdateValue
 {% endif %}
+{% if target.requires_uuid(api=api) %}
+from core.util.typing_util import UuidString
+{% endif %}
 {% if target.requires_uploaded_file(api=api) %}
 from core.api.uploaded_file import UploadedFile
 {% endif %}

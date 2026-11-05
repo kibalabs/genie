@@ -7,6 +7,9 @@ import pydantic
 {% endif %}
 from core import exceptions
 from core.util.typing_util import Json
+{% if target.requires_uuid(api=api) %}
+from core.util.typing_util import UuidString
+{% endif %}
 from . import resources
 
 

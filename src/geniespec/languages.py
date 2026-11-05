@@ -73,7 +73,7 @@ class BaseLanguageDefinition:
     def string_type(self, isNullable: bool) -> str:
         raise NotImplementedError
 
-    def uuid_type(self, isNullable: bool, isLocalReference: bool) -> str:
+    def uuid_type(self, isNullable: bool) -> str:
         raise NotImplementedError
 
     def enum_type(self, isNullable: bool, renderableType: RenderableType, apiVersion: Version, isLocalReference: bool) -> str:
@@ -114,7 +114,7 @@ class BaseLanguageDefinition:
         if yamlType == PrimitiveTypes.STRING:
             return self.string_type(isNullable=isNullable)
         if yamlType == PrimitiveTypes.UUID:
-            return self.uuid_type(isNullable=isNullable, isLocalReference=isLocalReference)
+            return self.uuid_type(isNullable=isNullable)
         if yamlType == PrimitiveTypes.BOOLEAN:
             return self.boolean_type(isNullable=isNullable)
         if yamlType == PrimitiveTypes.DATETIME:
@@ -348,9 +348,8 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
     def string_type(self, isNullable: bool) -> str:
         return 'str | None' if isNullable else 'str'
 
-    def uuid_type(self, isNullable: bool, isLocalReference: bool) -> str:
-        typeName = 'UuidString' if isLocalReference else 'resources.UuidString'
-        return f'{typeName} | None' if isNullable else typeName
+    def uuid_type(self, isNullable: bool) -> str:
+        return 'UuidString | None' if isNullable else 'UuidString'
 
     def enum_type(self, isNullable: bool, renderableType: RenderableType, apiVersion: Version, isLocalReference: bool) -> str:
         if renderableType.className is None:
@@ -448,7 +447,7 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
         return any(self._contains_json(renderableType=attribute.fieldType) for resource in api.resources for attribute in resource.attributes)
 
     def resources_require_typing(self, api: RenderableApi) -> bool:
-        return len(api.enums) > 0 or len(api.oneOfs) > 0 or self.requires_uuid(api=api) or any(self.is_inline_enum(renderableType=attribute.fieldType) for resource in api.resources for attribute in resource.attributes)
+        return len(api.enums) > 0 or len(api.oneOfs) > 0 or any(self.is_inline_enum(renderableType=attribute.fieldType) for resource in api.resources for attribute in resource.attributes)
 
     def one_of_alias(self, oneOf: RenderableOneOf, apiVersion: Version) -> str:
         return f'typing.Annotated[{" | ".join(self.one_of_member_class_names(oneOf=oneOf, apiVersion=apiVersion))}, pydantic.Field(discriminator={self.identifier(name=oneOf.discriminator)!r})]'
@@ -583,7 +582,7 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
     def string_type(self, isNullable: bool) -> str:
         return self._nullable(typeName='string', isNullable=isNullable)
 
-    def uuid_type(self, isNullable: bool, isLocalReference: bool) -> str:  # noqa: ARG002
+    def uuid_type(self, isNullable: bool) -> str:
         return self._nullable(typeName='string', isNullable=isNullable)
 
     def enum_type(self, isNullable: bool, renderableType: RenderableType, apiVersion: Version, isLocalReference: bool) -> str:
