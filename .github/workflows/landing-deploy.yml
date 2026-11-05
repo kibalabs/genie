@@ -10,7 +10,7 @@ on:
 concurrency:
   group: landing-deploy
 env:
-  DOMAIN_NAME: 'genie.kibalabs.com'
+  DOMAIN_NAME: 'geniespec.com'
   DIST_DIR: './landing'
 jobs:
   deploy:
