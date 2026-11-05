@@ -4,10 +4,12 @@
 {% set coreImports = [] %}
 {% if target.requires_date_parsing(renderableTypes=responseTypes) %}{% set _ = coreImports.append('dateFromString') %}{% endif %}
 {% if target.requires_date_parsing(renderableTypes=bodyTypes) %}{% set _ = coreImports.append('dateToString') %}{% endif %}
-{% set _ = coreImports.append('RawObject') %}
+{% if target.requires_request_data(api=api) or responseTypes %}{% set _ = coreImports.append('RawObject') %}{% endif %}
 {% if target.requires_request_data(api=api) %}{% set _ = coreImports.append('RequestData') %}{% endif %}
 {% if responseTypes %}{% set _ = coreImports.append('ResponseData') %}{% endif %}
+{% if coreImports %}
 import { {{ coreImports | join(', ') }} } from '@kibalabs/core';
+{% endif %}
 {% if target.references_resources(renderableTypes=responseTypes + bodyTypes) %}
 
 import * as Resources from './resources';

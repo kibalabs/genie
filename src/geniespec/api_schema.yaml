@@ -158,6 +158,8 @@ definitions:
         type: boolean
       isDeprecated:
         type: boolean
+      description:
+        type: string
       defaultValue:
         type:
           - string
@@ -242,6 +244,19 @@ definitions:
           - json
           - stream
           - redirect
+      operationId:
+        type: string
+        pattern: '^[A-Za-z][A-Za-z0-9_]*$'
+      summary:
+        type: string
+      description:
+        type: string
+      tags:
+        type: array
+        items:
+          type: string
+      extensions:
+        type: object
   Transition:
     type: object
     additionalProperties: false
@@ -285,6 +300,19 @@ definitions:
           - collection
       isIndirectAction:
         type: boolean
+      operationId:
+        type: string
+        pattern: '^[A-Za-z][A-Za-z0-9_]*$'
+      summary:
+        type: string
+      description:
+        type: string
+      tags:
+        type: array
+        items:
+          type: string
+      extensions:
+        type: object
   RootTransition:
     type: object
     allOf:
@@ -328,6 +356,8 @@ definitions:
           - 'null'
       isDeprecated:
         type: boolean
+      description:
+        type: string
       maxValue:
         type:
           - string
@@ -374,6 +404,8 @@ definitions:
         type: boolean
       isList:
         type: boolean
+      description:
+        type: string
   Exception:
     type: object
     additionalProperties: false

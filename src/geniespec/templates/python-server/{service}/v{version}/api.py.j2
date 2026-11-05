@@ -2,11 +2,12 @@
 # ruff: noqa: ARG001
 {% if target.requires_streaming(api=api) %}
 import collections.abc
-{% endif %}
-import datetime
 
+{% endif %}
+{% if api.operations %}
 from core.api.api_request import KibaApiRequest
 from core.api.route import route
+{% endif %}
 from core.api.route_auth import RouteAuthResolver
 {% if api.rateLimits %}
 from core.api.route_metadata import RateLimitConfig
@@ -14,10 +15,14 @@ from core.api.route_metadata import RateLimitConfig
 {% if target.requires_redirect(api=api) %}
 from core.exceptions import FoundRedirectException
 {% endif %}
+{% if api.operations %}
 from core.http.rest_method import RestMethod
+{% endif %}
 from starlette.routing import BaseRoute
+{% if api.operations %}
 from starlette.routing import Route
 from . import endpoints
+{% endif %}
 from .internal import {{ target.internal_class_name(api=api) }}
 {% for rateLimit in api.rateLimits %}
 {{ target.rate_limit_constant_name(name=rateLimit.name.kebabCaseString) }}: RateLimitConfig = {{ target.rate_limit_config(rateLimit=rateLimit) }}
@@ -30,7 +35,7 @@ def create_routes(internal: {{ target.internal_class_name(api=api) }}, {% if tar
 {% set rate_limit = target.route_rate_limit(operation=operation) %}
 {% set class_name = target.operation_class_name(operation=operation) %}
 {% set result_name = target.identifier(name=operation.responseFields[0].name) if operation.responseFields else 'result' %}
-    @route(requestType=endpoints.{{ class_name }}Request, responseType=endpoints.{{ class_name }}Response{% if target.is_streaming(operation=operation) %}, isStreaming=True{% endif %}{% if auth is not none %}, authResolver=authResolver, auth='{{ auth }}'{% endif %}{% if rate_limit is not none %}, rateLimit={{ target.rate_limit_constant_name(name=rate_limit) }}{% endif %})
+    @route(requestType=endpoints.{{ class_name }}Request, responseType=endpoints.{{ class_name }}Response{% if target.is_streaming(operation=operation) %}, isStreaming=True{% endif %}{% if auth is not none %}, authResolver=authResolver, auth='{{ auth }}'{% endif %}{% if rate_limit is not none %}, rateLimit={{ target.rate_limit_constant_name(name=rate_limit) }}{% endif %}{{ target.route_documentation_arguments(operation=operation) }})
     async def {{ target.operation_name(operation=operation) }}(request: KibaApiRequest[endpoints.{{ class_name }}Request]) -> {% if target.is_streaming(operation=operation) %}collections.abc.AsyncIterator[endpoints.{{ class_name }}Response]{% else %}endpoints.{{ class_name }}Response{% endif %}:
 {% for parameter in target.request_parameters(operation=operation) %}
 {% set param_name = target.identifier(name=parameter.name) %}

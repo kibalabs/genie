@@ -15,11 +15,16 @@ import pytest
 import yaml  # type: ignore[import-untyped]
 from core.api.api_request import KibaApiRequest
 from core.api.middleware.origin_ip_middleware import OriginIpMiddleware
+from core.api.openapi import OpenApiSchemaGenerator
+from core.api.openapi import OpenApiTag
+from core.api.route_metadata import RouteMetadata
 from core.exceptions import BadRequestException
 from core.exceptions import FoundRedirectException
 from core.exceptions import TooManyRequestsException
 from core.util.typing_util import UNDEFINED
 from starlette.applications import Starlette
+from starlette.routing import BaseRoute
+from starlette.schemas import EndpointInfo
 from starlette.testclient import TestClient
 
 from geniespec.cli import build
@@ -61,7 +66,7 @@ class _AuthResolver:
         return []
 
 
-def _client(calls: dict[str, dict[str, object]], returnValues: dict[str, object], authResolver: _AuthResolver | None = None) -> TestClient:
+def _routes(calls: dict[str, dict[str, object]], returnValues: dict[str, object], authResolver: _AuthResolver | None = None) -> list[BaseRoute]:
     internalClass = _module('internal').GenieTestApiV1Internal
 
     def implementation(methodName: str) -> object:
@@ -81,7 +86,11 @@ def _client(calls: dict[str, dict[str, object]], returnValues: dict[str, object]
         return method
 
     internal = type('FakeInternal', (internalClass,), {name: implementation(methodName=name) for name in internalClass.__abstractmethods__})()
-    return TestClient(Starlette(routes=_module('api').create_routes(internal=internal, authResolver=authResolver or _AuthResolver())))
+    return typing.cast(list[BaseRoute], _module('api').create_routes(internal=internal, authResolver=authResolver or _AuthResolver()))
+
+
+def _client(calls: dict[str, dict[str, object]], returnValues: dict[str, object], authResolver: _AuthResolver | None = None) -> TestClient:
+    return TestClient(Starlette(routes=_routes(calls=calls, returnValues=returnValues, authResolver=authResolver)))
 
 
 def test_static_path_segments_match_before_path_parameters(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1014,6 +1023,75 @@ transitions:
     assert authResolver.policies == ['resource_owner', 'admin_user']
 
 
+class _ExtensionRecorder:
+    def __init__(self) -> None:
+        self.extensions: dict[str, object] = {}
+
+    def update_document(self, document: dict[str, object]) -> None:
+        pass
+
+    def update_operation(self, *, route: EndpointInfo, metadata: RouteMetadata, operation: dict[str, object]) -> None:  # type: ignore[explicit-any]  # noqa: ARG002
+        self.extensions[str(operation['operationId'])] = metadata.get('extensions')
+
+
+def test_documentation_fields_reach_the_openapi_document(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _generate(
+        specYaml="""
+resources:
+  - singleName: Member
+    collectionName: Members
+    attributes:
+      - name: member-id
+        type: String
+        isPrimary: true
+        description: The member's id.
+      - name: name
+        type: String
+        description: Display name.
+    transitions:
+      - action: GET
+        operationId: getMember
+        summary: Get a member
+        description: Returns one member.
+        tags: [Members]
+        extensions: {deprecated: true}
+transitions:
+  - action: RENAME
+    operationId: rename
+    summary: Rename
+    requestFields:
+      - name: name
+        type: String
+        isRequired: true
+        description: The new name.
+      - name: reason
+        type: String
+        description: Why it changed.
+    responseField:
+      name: is-renamed
+      type: Boolean
+      description: Whether the name changed.
+  - action: PING
+""",
+        outputDirectory=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    extensionRecorder = _ExtensionRecorder()
+    schemaGenerator = OpenApiSchemaGenerator(title='Test', version='1', description='', tags=[OpenApiTag(name='Members')], securitySchemes=[], extensions=[extensionRecorder])
+    document = schemaGenerator.get_schema(routes=_routes(calls={}, returnValues={}))
+    paths = typing.cast(dict[str, dict[str, dict[str, typing.Any]]], document['paths'])  # type: ignore[explicit-any]
+    schemas = typing.cast(dict[str, dict[str, typing.Any]], typing.cast(dict[str, object], document['components'])['schemas'])  # type: ignore[explicit-any]
+    getMember = paths['/members/{memberId}']['get']
+    assert (getMember['operationId'], getMember['summary'], getMember['description'], getMember['tags']) == ('getMember', 'Get a member', 'Returns one member.', ['Members'])
+    assert getMember['parameters'][0]['schema']['description'] == "The member's id."
+    assert schemas['MemberV1']['properties']['name']['description'] == 'Display name.'
+    renameBody = paths['/rename']['post']['requestBody']['content']['application/json']['schema']
+    assert (renameBody['properties']['name']['description'], renameBody['properties']['reason']['description'], renameBody['required']) == ('The new name.', 'Why it changed.', ['name'])
+    assert schemas['RenameResponse']['properties']['isRenamed']['description'] == 'Whether the name changed.'
+    assert set(paths) == {'/members/{memberId}', '/rename'}
+    assert extensionRecorder.extensions == {'getMember': {'deprecated': True}, 'rename': {}}
+
+
 @pytest.mark.parametrize(
     ('specYaml', 'expectedErrors'),
     [
@@ -1475,6 +1553,33 @@ transitions:
                 'pong: rate limit per-user is keyed by user, so the transition needs authentication',
             ],
             id='invalid-transition-rate-limits',
+        ),
+        pytest.param(
+            """
+resources:
+  - singleName: Member
+    collectionName: Members
+    attributes:
+      - name: member-id
+        type: String
+        isPrimary: true
+      - name: email
+        type: String
+        isUnique: true
+    transitions:
+      - action: GET
+        operationId: getMember
+transitions:
+  - action: PING
+    operationId: ping
+  - action: PONG
+    operationId: ping
+""",
+            [
+                'Duplicate operationId: getMember',
+                'Duplicate operationId: ping',
+            ],
+            id='duplicate-operation-ids',
         ),
     ],
 )
