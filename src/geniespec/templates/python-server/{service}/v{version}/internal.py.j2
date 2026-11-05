@@ -5,6 +5,9 @@ import collections.abc
 {% if target.operations_require_typing(api=api) %}
 import typing
 {% endif %}
+{% if target.requires_uuid(api=api) %}
+import uuid
+{% endif %}
 
 {% if target.operations_require_json(api=api) %}
 import pydantic

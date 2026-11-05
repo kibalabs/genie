@@ -6,6 +6,9 @@ import datetime
 {% if target.resources_require_typing(api=api) %}
 import typing
 {% endif %}
+{% if target.requires_uuid(api=api) %}
+import uuid
+{% endif %}
 
 {% if target.resources_require_json(api=api) or api.oneOfs %}
 import pydantic

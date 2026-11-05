@@ -54,6 +54,8 @@ resources:
 
 Fields use it like any other type (`type: ViewContent`, also inside `List` and `Mapping`). `python-server` generates a `ViewContentV1` pydantic discriminated union in `resources`; `typescript-client` generates a `ViewContentV1` union type and a `viewContentV1FromObject` function that builds the member class named by the discriminator (and throws for unknown values).
 
+`type: Uuid` is a string that must be a valid UUID. It works anywhere `String` does, including as a primary attribute in paths. `python-server` types it as `uuid.UUID`, so pydantic rejects other strings with a 400, internal methods get `uuid.UUID` objects and responses write them in the standard lowercase hyphenated form; `typescript-client` types it as `string`.
+
 ## Rate limits
 
 Name rate limits at the top level, then pick one per transition with `rateLimit`. `defaultRateLimit` applies to every transition that doesn't set one, and `rateLimit: none` turns it off for a transition, the same way `defaultAuthentication` and `authentication` work:
