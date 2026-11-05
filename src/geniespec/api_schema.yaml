@@ -208,6 +208,12 @@ definitions:
         type: array
         items:
           type: string
+      overrides:
+        type: object
+        additionalProperties: false
+        properties:
+          shouldPrefixParentName:
+            type: boolean
   BaseTransition:
     type: object
     additionalProperties: false

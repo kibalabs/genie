@@ -140,6 +140,10 @@ class RootTransition(BaseTransition):
     pass
 
 
+class ResourceOverrides(BaseModel):
+    shouldPrefixParentName: bool = True
+
+
 class Resource(BaseModel):
     singleName: str
     collectionName: str
@@ -147,6 +151,7 @@ class Resource(BaseModel):
     attributes: list[Attribute] = []
     transitions: list[Transition] = []
     accessibleFrom: list[str] = []
+    overrides: ResourceOverrides = ResourceOverrides()
 
     @property
     def primaryAttribute(self) -> Attribute | None:  # noqa: N802
