@@ -85,6 +85,7 @@ class Attribute(BaseModel):
     isSettable: bool = False
     isAccessibleIndependently: bool = False
     defaultValue: str | int | float | bool | None = None
+    description: str | None = None
 
 
 class ResponseField(BaseModel):
@@ -96,6 +97,7 @@ class ResponseField(BaseModel):
     enumValues: list[str] = []
     isNullable: bool = False
     isList: bool = False
+    description: str | None = None
 
 
 class RequestField(BaseModel):
@@ -111,6 +113,7 @@ class RequestField(BaseModel):
     maxValue: str | int | float | None = None
     minValue: str | int | float | None = None
     source: str = FieldSources.REQUEST
+    description: str | None = None
 
 
 class BaseTransition(BaseModel):
@@ -121,6 +124,11 @@ class BaseTransition(BaseModel):
     authentication: str | None = None
     rateLimit: str | None = None
     responseType: str = ResponseTypes.JSON
+    operationId: str | None = None
+    summary: str | None = None
+    description: str | None = None
+    tags: list[str] = []
+    extensions: dict[str, pydantic.JsonValue] = {}
 
 
 class Transition(BaseTransition):

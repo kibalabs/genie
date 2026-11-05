@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+import pydantic
 from core.exceptions import KibaException
 from pydantic import BaseModel
 
@@ -128,6 +129,7 @@ class RenderableField(BaseModel):
     name: RenderableString
     fieldType: RenderableType
     defaultValue: str | int | float | bool | None = None
+    description: str | None = None
 
 
 class RenderableAttribute(RenderableField):
@@ -191,7 +193,7 @@ class RenderableEndpoint(BaseModel):
     @property
     def urlParameters(self) -> list[RenderableParameter]:  # noqa: N802
         return [
-            RenderableParameter(name=component.attribute.name, fieldType=component.attribute.fieldType, isRequired=True, isDeprecated=False)
+            RenderableParameter(name=component.attribute.name, fieldType=component.attribute.fieldType, isRequired=True, isDeprecated=False, description=component.attribute.description)
             for component in self.components
             if isinstance(component, ResourceEndpointComponent) and component.attribute is not None
         ]
@@ -215,6 +217,11 @@ class RenderableOperation(BaseModel):
     rateLimit: str | None = None
     isIndirectAction: bool = False
     responseType: str = ResponseTypes.JSON
+    operationId: str | None = None
+    summary: str | None = None
+    description: str | None = None
+    tags: list[str] = []
+    extensions: dict[str, pydantic.JsonValue] = {}
 
     @property
     def urlParameters(self) -> list[RenderableParameter]:  # noqa: N802

@@ -1,6 +1,7 @@
 import collections
 import keyword
 import re
+import typing
 
 from core.exceptions import KibaException
 
@@ -8,6 +9,7 @@ from geniespec.renderable_types import ActionEndpointComponent
 from geniespec.renderable_types import AttributeEndpointComponent
 from geniespec.renderable_types import MappingRenderableType
 from geniespec.renderable_types import RenderableApi
+from geniespec.renderable_types import RenderableAttribute
 from geniespec.renderable_types import RenderableEndpointComponent
 from geniespec.renderable_types import RenderableEnum
 from geniespec.renderable_types import RenderableException
@@ -405,6 +407,43 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
     def requires_optional_field_default(self, api: RenderableApi) -> bool:
         return any(not self.is_undefined_parameter(operation=operation, parameter=parameter) and not parameter.isRequired and not parameter.fieldType.isNullable for operation in api.operations for parameter in self.request_parameters(operation=operation))
 
+    def endpoints_require_field(self, api: RenderableApi) -> bool:
+        hasRequestDescriptions = any(parameter.description is not None for operation in api.operations for parameter in self.request_parameters(operation=operation))
+        hasResponseDescriptions = any(field.description is not None for operation in api.operations for field in operation.responseFields or [])
+        return self.requires_optional_field_default(api=api) or hasRequestDescriptions or hasResponseDescriptions
+
+    @staticmethod
+    def resources_require_field(api: RenderableApi) -> bool:
+        return any(attribute.description is not None for resource in api.resources for attribute in resource.attributes)
+
+    @staticmethod
+    def _field_default(default: str | None, description: str | None, fieldFunction: str = 'Field', shouldUseField: bool = False) -> str:
+        if description is None and not shouldUseField:
+            return '' if default is None else f' = {default}'
+        arguments = ([] if default is None else [f'default={default}']) + ([] if description is None else [f'description={description!r}'])
+        return f' = {fieldFunction}({", ".join(arguments)})'
+
+    def request_field_declaration(self, operation: RenderableOperation, parameter: RenderableParameter, apiVersion: Version) -> str:
+        typeName = self.type(renderableType=parameter.fieldType, apiVersion=apiVersion)
+        if self.is_undefined_parameter(operation=operation, parameter=parameter):
+            return f'UpdateValue[{typeName}]{self._field_default(default="UNDEFINED", description=parameter.description)}'
+        if parameter.isRequired:
+            return f'{typeName}{self._field_default(default=None, description=parameter.description)}'
+        if parameter.fieldType.isNullable:
+            return f'{typeName}{self._field_default(default="None", description=parameter.description)}'
+        return f'{typeName}{self._field_default(default=f"typing.cast({typeName}, None)", description=parameter.description, shouldUseField=True)}'
+
+    def response_field_declaration(self, field: RenderableField, apiVersion: Version) -> str:
+        return f'{self.type(renderableType=field.fieldType, apiVersion=apiVersion)}{self._field_default(default=None, description=field.description)}'
+
+    def attribute_declaration(self, attribute: RenderableAttribute, apiVersion: Version) -> str:
+        return f'{self.type(renderableType=attribute.fieldType, apiVersion=apiVersion, isLocalReference=True)}{self._field_default(default=None, description=attribute.description, fieldFunction="pydantic.Field")}'
+
+    @staticmethod
+    def route_documentation_arguments(operation: RenderableOperation) -> str:
+        arguments = {'operationId': operation.operationId, 'summary': operation.summary, 'description': operation.description, 'tags': operation.tags or None, 'extensions': operation.extensions or None}
+        return ''.join(f', {name}={value!r}' for name, value in arguments.items() if value is not None)
+
     def requires_streaming(self, api: RenderableApi) -> bool:
         return any(self.is_streaming(operation=operation) for operation in api.operations)
 
@@ -426,25 +465,32 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
         return parameterName if self.requires_parameter_preprocessing(operation=operation, parameter=parameter) else f'request.data.{parameterName}'
 
     @staticmethod
-    def _contains_json(renderableType: RenderableType) -> bool:
+    def _type_parts(renderableType: RenderableType) -> list[RenderableType]:
         if isinstance(renderableType, MappingRenderableType):
-            return PythonLanguageDefinition._contains_json(renderableType=renderableType.keyType) or PythonLanguageDefinition._contains_json(renderableType=renderableType.valueType)
-        return renderableType.rawType == PrimitiveTypes.JSON
+            return [renderableType, *PythonLanguageDefinition._type_parts(renderableType=renderableType.keyType), *PythonLanguageDefinition._type_parts(renderableType=renderableType.valueType)]
+        return [renderableType]
 
-    @staticmethod
-    def _contains_uuid(renderableType: RenderableType) -> bool:
-        if isinstance(renderableType, MappingRenderableType):
-            return PythonLanguageDefinition._contains_uuid(renderableType=renderableType.keyType) or PythonLanguageDefinition._contains_uuid(renderableType=renderableType.valueType)
-        return renderableType.rawType == PrimitiveTypes.UUID
+    def _module_field_types(self, api: RenderableApi, module: str) -> list[RenderableType]:
+        responseFieldTypes = [field.fieldType for operation in api.operations for field in operation.responseFields or []]
+        if module == 'resources':
+            return [attribute.fieldType for resource in api.resources for attribute in resource.attributes]
+        if module == 'endpoints':
+            return [parameter.fieldType for operation in api.operations for parameter in self.request_parameters(operation=operation)] + responseFieldTypes
+        if module == 'internal':
+            return [parameter.fieldType for operation in api.operations for parameter in operation.parameters] + responseFieldTypes
+        if module == 'exceptions':
+            return [field.fieldType for exception in api.exceptions for field in exception.fields]
+        raise KibaException(message=f'Unknown module: {module}')
 
-    def requires_uuid(self, api: RenderableApi) -> bool:
-        fieldTypes = [attribute.fieldType for resource in api.resources for attribute in [*resource.attributes, *resource.independentAttributes]]
-        fieldTypes += [parameter.fieldType for operation in api.operations for parameter in operation.parameters] + [field.fieldType for operation in api.operations for field in operation.responseFields or []]
-        fieldTypes += [field.fieldType for exception in api.exceptions for field in exception.fields]
-        return any(self._contains_uuid(renderableType=fieldType) for fieldType in fieldTypes)
-
-    def resources_require_json(self, api: RenderableApi) -> bool:
-        return any(self._contains_json(renderableType=attribute.fieldType) for resource in api.resources for attribute in resource.attributes)
+    def module_requires(self, api: RenderableApi, module: str, requirement: str) -> bool:
+        predicates: dict[str, typing.Callable[[RenderableType], bool]] = {
+            'collections': lambda part: part.isList or isinstance(part, MappingRenderableType),
+            'datetime': lambda part: part.rawType in (PrimitiveTypes.DATETIME, PrimitiveTypes.DATE),
+            'json': lambda part: part.rawType == PrimitiveTypes.JSON,
+            'resources': lambda part: part.className is not None,
+            'uuid': lambda part: part.rawType == PrimitiveTypes.UUID,
+        }
+        return any(predicates[requirement](part) for fieldType in self._module_field_types(api=api, module=module) for part in self._type_parts(renderableType=fieldType))
 
     def resources_require_typing(self, api: RenderableApi) -> bool:
         return len(api.enums) > 0 or len(api.oneOfs) > 0 or any(self.is_inline_enum(renderableType=attribute.fieldType) for resource in api.resources for attribute in resource.attributes)
@@ -458,13 +504,6 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
 
     def requires_uploaded_file(self, api: RenderableApi) -> bool:
         return any(self.is_file_operation(operation=operation) for operation in api.operations)
-
-    def operations_require_json(self, api: RenderableApi) -> bool:
-        fieldTypes = [parameter.fieldType for operation in api.operations for parameter in operation.parameters] + [field.fieldType for operation in api.operations for field in operation.responseFields or []]
-        return any(self._contains_json(renderableType=fieldType) for fieldType in fieldTypes)
-
-    def exceptions_require_json(self, api: RenderableApi) -> bool:
-        return any(self._contains_json(renderableType=field.fieldType) for exception in api.exceptions for field in exception.fields)
 
     def route_ordered_operations(self, api: RenderableApi) -> list[RenderableOperation]:
         return sorted(api.operations, key=lambda operation: tuple(segment.startswith('{') for segment in self.endpoint(operation=operation).split('/')))
@@ -671,6 +710,12 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
 
     def requires_request_data(self, api: RenderableApi) -> bool:
         return any(self.body_parameters(operation=operation) and not self.is_file_operation(operation=operation) for operation in self.client_operations(api=api))
+
+    def requires_rest_method(self, api: RenderableApi) -> bool:
+        return any(not self.is_file_operation(operation=operation) for operation in self.client_operations(api=api))
+
+    def has_endpoint_classes(self, api: RenderableApi) -> bool:
+        return len(self.body_parameter_types(api=api)) > 0 or len(self.response_field_types(api=api)) > 0
 
     def form_value(self, renderableType: RenderableType, value: str) -> str:
         if renderableType.rawType == RenderableRawTypes.FILE:

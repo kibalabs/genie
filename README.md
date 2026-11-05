@@ -79,6 +79,30 @@ transitions:
 
 A rate limit needs at least one of `perMinute`, `perFiveMinutes`, `perHour` and `perDay`. `keyBy` is `user` (the default) or `ip`. Requests over any window are rejected with a 429. Limits keyed by `user` count per authenticated user, so a transition using one needs `authentication`. `python-server` writes each rate limit as a `RATE_LIMIT_<NAME>` kiba-core `RateLimitConfig` and passes it to `route`; keying by `ip` needs kiba-core's `OriginIpMiddleware`. `typescript-client` ignores rate limits.
 
+## API docs
+
+Transitions can set `operationId`, `summary`, `description`, `tags` and `extensions`, and attributes, request fields and response fields can set a `description`:
+
+```yaml
+resources:
+  - singleName: Member
+    collectionName: Members
+    attributes:
+      - name: member-id
+        type: Uuid
+        isPrimary: true
+        description: The member's id.
+    transitions:
+      - action: GET
+        operationId: getMember
+        summary: Get a member
+        description: Returns one member.
+        tags: [Members]
+        extensions: {deprecated: true}
+```
+
+`python-server` passes the transition fields to kiba-core's `route`, whose `OpenApiSchemaGenerator` documents every route with an `operationId` (and skips the rest); `extensions` reach `OpenApiExtension`s as `metadata['extensions']`. Field descriptions become pydantic `Field(description=...)`, so they show up in the request and response schemas. Each `operationId` must be unique, so a transition that generates more than one route (for example `GET` on a resource with unique attributes) can't set one. `typescript-client` ignores these fields.
+
 # Development
 
 ```

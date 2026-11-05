@@ -199,6 +199,7 @@ class Renderer:
             isRequired=requestField.isRequired,
             isDeprecated=requestField.isDeprecated,
             source=requestField.source,
+            description=requestField.description,
         )
 
     def _response_field_to_renderable_field(self, responseField: ResponseField, knownTypeNames: dict[str, str]) -> RenderableField:
@@ -214,6 +215,7 @@ class Renderer:
                 mappingValueTypes=responseField.mappingValueTypes,
                 enumValues=responseField.enumValues,
             ),
+            description=responseField.description,
         )
 
     def _attribute_to_renderable_attribute(self, attribute: Attribute, knownTypeNames: dict[str, str], isNullable: bool | None = None) -> RenderableAttribute:
@@ -236,6 +238,7 @@ class Renderer:
             isAccessibleIndependently=attribute.isAccessibleIndependently,
             isSettable=attribute.isSettable,
             isNullable=attribute.isNullable,
+            description=attribute.description,
         )
 
     def _attribute_to_renderable_parameter(self, attribute: Attribute, isRequired: bool, knownTypeNames: dict[str, str], shouldUseDefault: bool = True) -> RenderableParameter:
@@ -254,7 +257,12 @@ class Renderer:
             defaultValue=attribute.defaultValue if shouldUseDefault else None,
             isRequired=isRequired,
             isDeprecated=attribute.isDeprecated,
+            description=attribute.description,
         )
+
+    @staticmethod
+    def _operation_documentation(transition: BaseTransition) -> dict[str, object]:
+        return {'operationId': transition.operationId, 'summary': transition.summary, 'description': transition.description, 'tags': transition.tags, 'extensions': transition.extensions}
 
     @staticmethod
     def _resource_full_name(resource: Resource, name: str) -> str:
@@ -458,7 +466,7 @@ class Renderer:
                 knownTypeNames=knownTypeNames,
                 defaultAuthentication=api.defaultAuthentication,
                 defaultRateLimit=api.defaultRateLimit,
-            )
+            ).model_copy(update=self._operation_documentation(transition=transition))
             for transition in api.transitions
         ]
         renderableExceptions = [
@@ -564,6 +572,7 @@ class Renderer:
                     for endpoint in customEndpoints:
                         customEndpoint = RenderableEndpoint(components=[*endpoint.components, ActionEndpointComponent(actionName=RenderableString.from_separated_string(string=transition.action, separator='-'))])
                         renderableApi.operations.append(self._action_operation(transition=transition, endpoint=customEndpoint, knownTypeNames=knownTypeNames, defaultAuthentication=api.defaultAuthentication, defaultRateLimit=api.defaultRateLimit, isIndirectAction=transition.isIndirectAction))
+                renderableApi.operations[operationCount:] = [operation.model_copy(update=self._operation_documentation(transition=transition)) for operation in renderableApi.operations[operationCount:]]
                 if len(renderableApi.operations) == operationCount:
                     uncoveredTransitions.append(f'{renderableResource.singleName.pascalCaseString} {transition.action}')
         if uncoveredTransitions:
@@ -573,6 +582,8 @@ class Renderer:
         rateLimitsByName = {rateLimit.name.kebabCaseString: rateLimit for rateLimit in renderableApi.rateLimits}
         operationErrors = [error for operation in renderableApi.operations for error in self._operation_errors(operation=operation, rateLimitsByName=rateLimitsByName)]
         operationErrors += self._file_errors(resources=renderableResources, exceptions=renderableExceptions)
+        operationIdCounts = collections.Counter(operation.operationId for operation in renderableApi.operations if operation.operationId is not None)
+        operationErrors += [f'Duplicate operationId: {operationId}' for operationId, count in operationIdCounts.items() if count > 1]
         if operationErrors:
             raise SemanticValidationException(message='\n'.join(operationErrors))
         renderableApi.resources.extend(renderableResources)
