@@ -103,6 +103,12 @@ resources:
 
 `python-server` passes the transition fields to kiba-core's `route`, whose `OpenApiSchemaGenerator` documents every route with an `operationId` (and skips the rest); `extensions` reach `OpenApiExtension`s as `metadata['extensions']`. Field descriptions become pydantic `Field(description=...)`, so they show up in the request and response schemas. Each `operationId` must be unique, so a transition that generates more than one route (for example `GET` on a resource with unique attributes) can't set one. `typescript-client` ignores these fields.
 
+## Overrides
+
+`overrides` keep an API that existed before genie working the same way once it moves to genie. They are meant to be dropped in the next major version of that API.
+
+- `shouldPrefixParentName: false` on a child resource names it without its parent's name: `Agent` under `User` stays `Agent` (not `UserAgent`), so its primary attribute is `agent-id` rather than `user-agent-id` and its fields keep their names. Its path is unchanged (`/users/{userId}/agents/{agentId}`).
+
 # Development
 
 ```

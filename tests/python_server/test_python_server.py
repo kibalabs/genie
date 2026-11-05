@@ -1092,6 +1092,39 @@ transitions:
     assert extensionRecorder.extensions == {'getMember': {'deprecated': True}, 'rename': {}}
 
 
+def test_child_resources_can_keep_their_own_names_under_their_parent(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _generate(
+        specYaml="""
+resources:
+  - singleName: User
+    collectionName: Users
+    attributes:
+      - name: user-id
+        type: String
+        isPrimary: true
+  - singleName: Agent
+    collectionName: Agents
+    parentResource: User
+    overrides:
+      shouldPrefixParentName: false
+    attributes:
+      - name: agent-id
+        type: String
+        isPrimary: true
+      - name: name
+        type: String
+    transitions:
+      - action: GET
+""",
+        outputDirectory=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    calls: dict[str, dict[str, object]] = {}
+    client = _client(calls=calls, returnValues={'get_agent_for_user_v1': _module('resources').AgentV1(agentId='a1', name='Ann')})
+    assert client.get('/users/u1/agents/a1').json() == {'agent': {'agentId': 'a1', 'name': 'Ann'}}
+    assert calls == {'get_agent_for_user_v1': {'userId': 'u1', 'agentId': 'a1'}}
+
+
 @pytest.mark.parametrize(
     ('specYaml', 'expectedErrors'),
     [

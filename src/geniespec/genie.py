@@ -266,7 +266,7 @@ class Renderer:
 
     @staticmethod
     def _resource_full_name(resource: Resource, name: str) -> str:
-        return f'{resource.parentResource or ""}{name}'
+        return f'{resource.parentResource or ""}{name}' if resource.overrides.shouldPrefixParentName else name
 
     def _resource_to_renderable_resource(self, resource: Resource, knownTypeNames: dict[str, str]) -> RenderableResource:
         attributes = [self._attribute_to_renderable_attribute(attribute=attribute, knownTypeNames=knownTypeNames) for attribute in resource.attributes]
@@ -298,7 +298,9 @@ class Renderer:
 
     @staticmethod
     def _relative_name(name: RenderableString, anchor: RenderableResource | None) -> RenderableString:
-        return RenderableString(string=name.string[len(anchor.singleName.string) :]) if anchor is not None else name
+        if anchor is None or name.string[: len(anchor.singleName.string)] != anchor.singleName.string:
+            return name
+        return RenderableString(string=name.string[len(anchor.singleName.string) :])
 
     def _resource_component(self, resource: RenderableResource, attribute: RenderableAttribute | None, anchor: RenderableResource | None) -> ResourceEndpointComponent:
         return ResourceEndpointComponent(
