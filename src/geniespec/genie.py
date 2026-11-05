@@ -233,6 +233,7 @@ class Renderer:
             ),
             defaultValue=attribute.defaultValue,
             isUnique=attribute.isUnique,
+            isUniqueInParent=attribute.isUniqueInParent,
             isPrimary=attribute.isPrimary,
             isUpdatable=attribute.isUpdatable,
             isAccessibleIndependently=attribute.isAccessibleIndependently,
@@ -465,6 +466,9 @@ class Renderer:
                     resourceErrors.append(f'{fullName} can only be accessible from root or an ancestor, not {anchorName}')
             parentPrimaryAttribute = resourcesByName[resource.parentResource].primaryAttribute if resource.parentResource in resourcesByName else None
             isOneToOne = parentPrimaryAttribute is not None and resource.primaryAttribute is not None and resource.primaryAttribute.name == parentPrimaryAttribute.name
+            resourceErrors += [f'{attribute.name} on {fullName} cannot be both isUniqueInParent and isPrimary or isUnique' for attribute in resource.attributes if attribute.isUniqueInParent and (attribute.isPrimary or attribute.isUnique)]
+            if any(attribute.isUniqueInParent for attribute in resource.attributes) and (resource.parentResource is None or isOneToOne):
+                resourceErrors.append(f'{fullName} can only have isUniqueInParent attributes when it is a (not one-to-one) child resource')
             expectedPrimaryName = f'{RenderableString.from_pascal_case_string(string=fullName).kebabCaseString}-id'
             if resource.transitions and resource.primaryAttribute is not None and not isOneToOne and resource.primaryAttribute.name != expectedPrimaryName:
                 resourceErrors.append(f'Primary attribute of {fullName} must be {expectedPrimaryName}, found {resource.primaryAttribute.name}')
@@ -557,21 +561,23 @@ class Renderer:
                         renderableApi.operations.append(RenderableOperation(method=method, endpoint=endpoint, query=None, body=None, responseFields=[returnValue], authentication=authentication, rateLimit=rateLimit))
                     endpointsAccessibleWithUnique = [endpoint for endpoint in endpoints.collectionEndpoints if isinstance(endpoint.components[-1], ResourceEndpointComponent)]
                     uniqueAttributes = [attribute for attribute in resource.attributes if attribute.isUnique and not attribute.isPrimary and not attribute.shouldDisableGetEndpoint and not attribute.isAccessibleIndependently]
-                    for endpoint in endpointsAccessibleWithUnique:
+                    uniqueInParentAttributes = [attribute for attribute in resource.attributes if attribute.isUniqueInParent and not attribute.shouldDisableGetEndpoint and not attribute.isAccessibleIndependently]
+                    lookups = [(endpoint, attribute) for endpoint in endpointsAccessibleWithUnique for attribute in uniqueAttributes]
+                    lookups += [(endpoint, attribute) for endpoint in self._get_canonical_endpoints(processableResource=processableResource).collectionEndpoints for attribute in uniqueInParentAttributes]
+                    for endpoint, attribute in lookups:
                         lastComponent = typing.cast(ResourceEndpointComponent, endpoint.components[-1])
-                        for attribute in uniqueAttributes:
-                            getByUniqueEndpoint = RenderableEndpoint(
-                                components=[
-                                    *endpoint.components[:-1],
-                                    ResourceEndpointComponent(
-                                        resource=lastComponent.resource,
-                                        attribute=self._attribute_to_renderable_attribute(attribute=attribute, isNullable=False, knownTypeNames=knownTypeNames),
-                                        relativeSingleName=lastComponent.relativeSingleName,
-                                        relativeCollectionName=lastComponent.relativeCollectionName,
-                                    ),
-                                ]
-                            )
-                            renderableApi.operations.append(RenderableOperation(method=method, endpoint=getByUniqueEndpoint, query=None, body=None, responseFields=[returnValue], authentication=authentication, rateLimit=rateLimit))
+                        getByUniqueEndpoint = RenderableEndpoint(
+                            components=[
+                                *endpoint.components[:-1],
+                                ResourceEndpointComponent(
+                                    resource=lastComponent.resource,
+                                    attribute=self._attribute_to_renderable_attribute(attribute=attribute, isNullable=False, knownTypeNames=knownTypeNames),
+                                    relativeSingleName=lastComponent.relativeSingleName,
+                                    relativeCollectionName=lastComponent.relativeCollectionName,
+                                ),
+                            ]
+                        )
+                        renderableApi.operations.append(RenderableOperation(method=method, endpoint=getByUniqueEndpoint, query=None, body=None, responseFields=[returnValue], authentication=authentication, rateLimit=rateLimit))
                 elif transition.action.upper() == 'LIST':
                     returnValue = RenderableField(name=processableResource.renderableResource.collectionName, fieldType=RenderableType(rawType='class', className=processableResource.renderableResource.singleName, isNullable=False, isList=True))
                     query = [self._request_field_to_renderable_parameter(requestField=requestField, knownTypeNames=knownTypeNames) for requestField in transition.requestFields]

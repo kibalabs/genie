@@ -134,6 +134,7 @@ class RenderableField(BaseModel):
 
 class RenderableAttribute(RenderableField):
     isUnique: bool = False
+    isUniqueInParent: bool = False
     isPrimary: bool = False
     isUpdatable: bool = False
     isNullable: bool = False

@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - [MINOR] Added resource `overrides` for moving an existing API to genie: `shouldPrefixParentName: false` names a child resource without its parent's name (so `Agent` under `User` keeps an `agent-id` primary attribute)
 - [MINOR] Added the `BigInt` type: an integer of any size sent as a JSON string. `python-server` types it as `int` (a `BigInt` alias in `resources` that serializes to a string and is documented as one); `typescript-client` types it as `bigint`
 - [MINOR] Added transition `overrides.responseFieldName`, which renames the response field of a `GET`, `LIST`, `CREATE` or `UPDATE` transition
+- [MINOR] Added `isUniqueInParent` on child resource attributes: like `isUnique`, a `GET` transition adds a lookup by the attribute, but only through the parent (`/chains/{chainId}/assets/address/{address}`)
 
 ### Changed
 - [MINOR] `defaultAuthentication` and `authentication` policy names can contain underscores (e.g. `resource_owner`)

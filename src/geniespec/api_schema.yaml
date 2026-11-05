@@ -148,6 +148,8 @@ definitions:
         type: boolean
       isUnique:
         type: boolean
+      isUniqueInParent:
+        type: boolean
       shouldDisableGetEndpoint:
         type: boolean
       isUnfilterable:

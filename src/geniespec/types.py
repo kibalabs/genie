@@ -78,6 +78,7 @@ class Attribute(BaseModel):
     enumValues: list[str] = []
     isPrimary: bool = False
     isUnique: bool = False
+    isUniqueInParent: bool = False
     shouldDisableGetEndpoint: bool = False
     isUnfilterable: bool = False
     isUpdatable: bool = False

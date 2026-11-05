@@ -8,6 +8,7 @@ import sys
 import types
 import typing
 import uuid
+from http import HTTPStatus
 
 import mypy.api
 import pydantic
@@ -1186,6 +1187,48 @@ resources:
     assert client.get('/notes').json() == {'items': [{'noteId': 'n1'}]}
 
 
+def test_child_resources_can_be_looked_up_by_fields_unique_in_their_parent(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _generate(
+        specYaml="""
+resources:
+  - singleName: Chain
+    collectionName: Chains
+    attributes:
+      - name: chain-id
+        type: Integer
+        isPrimary: true
+  - singleName: Asset
+    collectionName: Assets
+    parentResource: Chain
+    accessibleFrom:
+      - root
+    attributes:
+      - name: chain-asset-id
+        type: Integer
+        isPrimary: true
+      - name: address
+        type: String
+        isUniqueInParent: true
+      - name: symbol
+        type: String
+        isUniqueInParent: true
+    transitions:
+      - action: GET
+""",
+        outputDirectory=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    calls: dict[str, dict[str, object]] = {}
+    asset = _module('resources').ChainAssetV1(chainAssetId=7, address='0xabc', symbol='USDC')
+    client = _client(calls=calls, returnValues={'get_asset_by_address_for_chain_v1': asset, 'get_asset_by_symbol_for_chain_v1': asset, 'get_chain_asset_v1': asset})
+    assetJson = {'chainAsset': {'chainAssetId': 7, 'address': '0xabc', 'symbol': 'USDC'}}
+    assert client.get('/chains/8453/assets/address/0xabc').json() == assetJson
+    assert client.get('/chains/8453/assets/symbol/USDC').json() == assetJson
+    assert client.get('/chain-assets/7').json() == assetJson
+    assert client.get('/chain-assets/address/0xabc').status_code == HTTPStatus.NOT_FOUND
+    assert calls == {'get_asset_by_address_for_chain_v1': {'chainId': 8453, 'address': '0xabc'}, 'get_asset_by_symbol_for_chain_v1': {'chainId': 8453, 'symbol': 'USDC'}, 'get_chain_asset_v1': {'chainAssetId': 7}}
+
+
 @pytest.mark.parametrize(
     ('specYaml', 'expectedErrors'),
     [
@@ -1695,6 +1738,24 @@ resources:
 """,
             ['Only GET, LIST, CREATE and UPDATE transitions can override responseFieldName: ARCHIVE'],
             id='response-field-name-on-custom-transition',
+        ),
+        pytest.param(
+            """
+resources:
+  - singleName: Asset
+    collectionName: Assets
+    attributes:
+      - name: asset-id
+        type: Integer
+        isPrimary: true
+      - name: address
+        type: String
+        isUniqueInParent: true
+    transitions:
+      - action: GET
+""",
+            ['Asset can only have isUniqueInParent attributes when it is a (not one-to-one) child resource'],
+            id='unique-in-parent-without-parent',
         ),
     ],
 )

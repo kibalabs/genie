@@ -237,7 +237,7 @@ class BaseLanguageDefinition:
             output = [self.kebab_name(name=component.relativeCollectionName)]
             if component.attribute is None:
                 return output
-            if component.attribute.isUnique and not component.attribute.isPrimary:
+            if (component.attribute.isUnique or component.attribute.isUniqueInParent) and not component.attribute.isPrimary:
                 output.append(self.kebab_name(name=component.attribute.name))
             if component.attribute.fieldType.rawType not in (PrimitiveTypes.INTEGER, PrimitiveTypes.LONG_INTEGER, PrimitiveTypes.STRING, PrimitiveTypes.UUID):
                 raise KibaException(message=f'ResourceEndpointComponent created with an invalid attribute type of {component.attribute.fieldType}. Valid types are: integer, long integer, string and uuid.')
@@ -279,7 +279,7 @@ class BaseLanguageDefinition:
         else:
             singleName, collectionName = target.relativeSingleName, target.relativeCollectionName
         targetName = singleName if isSingle else collectionName
-        if isinstance(target, ResourceEndpointComponent) and target.attribute is not None and target.attribute.isUnique and not target.attribute.isPrimary:
+        if isinstance(target, ResourceEndpointComponent) and target.attribute is not None and (target.attribute.isUnique or target.attribute.isUniqueInParent) and not target.attribute.isPrimary:
             targetName += RenderableString(string=['by']) + target.attribute.name
         if operation.isIndirectAction:
             targetName = RenderableString(string=['for']) + targetName
