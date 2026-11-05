@@ -264,6 +264,15 @@ class Renderer:
     def _operation_documentation(transition: BaseTransition) -> dict[str, object]:
         return {'operationId': transition.operationId, 'summary': transition.summary, 'description': transition.description, 'tags': transition.tags, 'extensions': transition.extensions}
 
+    def _with_transition_fields(self, operation: RenderableOperation, transition: BaseTransition, isStandard: bool) -> RenderableOperation:
+        update = self._operation_documentation(transition=transition)
+        responseFieldName = transition.overrides.responseFieldName
+        if responseFieldName is not None:
+            if not isStandard or not operation.responseFields:
+                raise SemanticValidationException(message=f'Only GET, LIST, CREATE and UPDATE transitions can override responseFieldName: {transition.action}')
+            update['responseFields'] = [field.model_copy(update={'name': RenderableString.from_kebab_case_string(string=responseFieldName)}) for field in operation.responseFields]
+        return operation.model_copy(update=update)
+
     @staticmethod
     def _resource_full_name(resource: Resource, name: str) -> str:
         return f'{resource.parentResource or ""}{name}' if resource.overrides.shouldPrefixParentName else name
@@ -462,13 +471,17 @@ class Renderer:
         if resourceErrors:
             raise SemanticValidationException(message='\n'.join(resourceErrors))
         renderableOperations = [
-            self._action_operation(
+            self._with_transition_fields(
+                operation=self._action_operation(
+                    transition=transition,
+                    endpoint=RenderableEndpoint(components=[ActionEndpointComponent(actionName=RenderableString.from_separated_string(string=transition.action, separator='-'))]),
+                    knownTypeNames=knownTypeNames,
+                    defaultAuthentication=api.defaultAuthentication,
+                    defaultRateLimit=api.defaultRateLimit,
+                ),
                 transition=transition,
-                endpoint=RenderableEndpoint(components=[ActionEndpointComponent(actionName=RenderableString.from_separated_string(string=transition.action, separator='-'))]),
-                knownTypeNames=knownTypeNames,
-                defaultAuthentication=api.defaultAuthentication,
-                defaultRateLimit=api.defaultRateLimit,
-            ).model_copy(update=self._operation_documentation(transition=transition))
+                isStandard=False,
+            )
             for transition in api.transitions
         ]
         renderableExceptions = [
@@ -574,7 +587,8 @@ class Renderer:
                     for endpoint in customEndpoints:
                         customEndpoint = RenderableEndpoint(components=[*endpoint.components, ActionEndpointComponent(actionName=RenderableString.from_separated_string(string=transition.action, separator='-'))])
                         renderableApi.operations.append(self._action_operation(transition=transition, endpoint=customEndpoint, knownTypeNames=knownTypeNames, defaultAuthentication=api.defaultAuthentication, defaultRateLimit=api.defaultRateLimit, isIndirectAction=transition.isIndirectAction))
-                renderableApi.operations[operationCount:] = [operation.model_copy(update=self._operation_documentation(transition=transition)) for operation in renderableApi.operations[operationCount:]]
+                isStandard = transition.action.upper() in {'CREATE', 'UPDATE', 'GET', 'LIST'}
+                renderableApi.operations[operationCount:] = [self._with_transition_fields(operation=operation, transition=transition, isStandard=isStandard) for operation in renderableApi.operations[operationCount:]]
                 if len(renderableApi.operations) == operationCount:
                     uncoveredTransitions.append(f'{renderableResource.singleName.pascalCaseString} {transition.action}')
         if uncoveredTransitions:

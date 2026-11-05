@@ -110,6 +110,7 @@ resources:
 `overrides` keep an API that existed before genie working the same way once it moves to genie. They are meant to be dropped in the next major version of that API.
 
 - `shouldPrefixParentName: false` on a child resource names it without its parent's name: `Agent` under `User` stays `Agent` (not `UserAgent`), so its primary attribute is `agent-id` rather than `user-agent-id` and its fields keep their names. Its path is unchanged (`/users/{userId}/agents/{agentId}`).
+- `responseFieldName` on a `GET`, `LIST`, `CREATE` or `UPDATE` transition renames the field its response puts the resource in (for example `memories` instead of `agentMemories`). Custom transitions name it with `responseField`.
 
 # Development
 

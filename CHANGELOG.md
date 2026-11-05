@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - [MINOR] Added API docs fields: `operationId`, `summary`, `description`, `tags` and `extensions` on transitions, and `description` on attributes, request fields and response fields. `python-server` passes the transition fields to kiba-core's `route` (so kiba-core's OpenAPI generator documents routes with an `operationId`) and writes field descriptions as pydantic `Field(description=...)`. Duplicate `operationId`s are rejected
 - [MINOR] Added resource `overrides` for moving an existing API to genie: `shouldPrefixParentName: false` names a child resource without its parent's name (so `Agent` under `User` keeps an `agent-id` primary attribute)
 - [MINOR] Added the `BigInt` type: an integer of any size sent as a JSON string. `python-server` types it as `int` (a `BigInt` alias in `resources` that serializes to a string and is documented as one); `typescript-client` types it as `bigint`
+- [MINOR] Added transition `overrides.responseFieldName`, which renames the response field of a `GET`, `LIST`, `CREATE` or `UPDATE` transition
 
 ### Changed
 - [MINOR] `defaultAuthentication` and `authentication` policy names can contain underscores (e.g. `resource_owner`)
