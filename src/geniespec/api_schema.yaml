@@ -263,6 +263,8 @@ definitions:
           type: string
       extensions:
         type: object
+      overrides:
+        $ref: '#/definitions/TransitionOverrides'
   Transition:
     type: object
     additionalProperties: false
@@ -319,6 +321,15 @@ definitions:
           type: string
       extensions:
         type: object
+      overrides:
+        $ref: '#/definitions/TransitionOverrides'
+  TransitionOverrides:
+    type: object
+    additionalProperties: false
+    properties:
+      responseFieldName:
+        type: string
+        pattern: '^[a-z][A-Za-z0-9-]*$'
   RootTransition:
     type: object
     allOf:

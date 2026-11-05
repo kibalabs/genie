@@ -117,6 +117,10 @@ class RequestField(BaseModel):
     description: str | None = None
 
 
+class TransitionOverrides(BaseModel):
+    responseFieldName: str | None = None
+
+
 class BaseTransition(BaseModel):
     action: str
     method: str | None = None
@@ -130,6 +134,7 @@ class BaseTransition(BaseModel):
     description: str | None = None
     tags: list[str] = []
     extensions: dict[str, pydantic.JsonValue] = {}
+    overrides: TransitionOverrides = TransitionOverrides()
 
 
 class Transition(BaseTransition):

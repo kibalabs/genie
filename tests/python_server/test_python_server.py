@@ -1164,6 +1164,28 @@ resources:
     assert calls == {'get_agent_for_user_v1': {'userId': 'u1', 'agentId': 'a1'}}
 
 
+def test_standard_transitions_can_rename_their_response_field(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _generate(
+        specYaml="""
+resources:
+  - singleName: Note
+    collectionName: Notes
+    attributes:
+      - name: note-id
+        type: String
+        isPrimary: true
+    transitions:
+      - action: LIST
+        overrides:
+          responseFieldName: items
+""",
+        outputDirectory=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    client = _client(calls={}, returnValues={'list_notes_v1': [_module('resources').NoteV1(noteId='n1')]})
+    assert client.get('/notes').json() == {'items': [{'noteId': 'n1'}]}
+
+
 @pytest.mark.parametrize(
     ('specYaml', 'expectedErrors'),
     [
@@ -1652,6 +1674,27 @@ transitions:
                 'Duplicate operationId: ping',
             ],
             id='duplicate-operation-ids',
+        ),
+        pytest.param(
+            """
+resources:
+  - singleName: Note
+    collectionName: Notes
+    attributes:
+      - name: note-id
+        type: String
+        isPrimary: true
+    transitions:
+      - action: ARCHIVE
+        operatesOn: individual
+        overrides:
+          responseFieldName: archived
+        responseField:
+          name: note
+          type: Note
+""",
+            ['Only GET, LIST, CREATE and UPDATE transitions can override responseFieldName: ARCHIVE'],
+            id='response-field-name-on-custom-transition',
         ),
     ],
 )
