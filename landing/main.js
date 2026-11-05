@@ -86,6 +86,7 @@ const runHero = async () => {
   const typescriptElement = document.getElementById('hero-typescript');
   const beam = document.querySelector('.lamp-beam');
   if (prefersReducedMotion) {
+    document.querySelector('.hero-stage').classList.add('generated');
     specElement.innerHTML = highlight(HERO_SPEC, 'yaml');
     pythonElement.innerHTML = highlight(HERO_PYTHON, 'python');
     typescriptElement.innerHTML = highlight(HERO_TYPESCRIPT, 'typescript');
@@ -98,16 +99,21 @@ const runHero = async () => {
       await sleep(70);
     }
   };
+  const stage = document.querySelector('.hero-stage');
+  const pythonPlaceholder = pythonElement.innerHTML;
+  const typescriptPlaceholder = typescriptElement.innerHTML;
   for (;;) {
-    pythonElement.innerHTML = '';
-    typescriptElement.innerHTML = '';
+    pythonElement.innerHTML = pythonPlaceholder;
+    typescriptElement.innerHTML = typescriptPlaceholder;
+    stage.classList.remove('generated');
     beam.classList.remove('active');
     for (let index = 1; index <= HERO_SPEC.length; index += 1) {
       specElement.innerHTML = `${highlight(HERO_SPEC.slice(0, index), 'yaml')}<span class="cursor"></span>`;
-      await sleep(HERO_SPEC[index - 1] === '\n' ? 90 : 22);
+      await sleep(HERO_SPEC[index - 1] === '\n' ? 70 : 16);
     }
     specElement.innerHTML = highlight(HERO_SPEC, 'yaml');
     beam.classList.add('active');
+    stage.classList.add('generated');
     await sleep(500);
     await Promise.all([revealLines(pythonElement, HERO_PYTHON, 'python'), revealLines(typescriptElement, HERO_TYPESCRIPT, 'typescript')]);
     await sleep(4200);

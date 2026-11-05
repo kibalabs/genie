@@ -43,10 +43,9 @@
   <main id="top">
     <section class="hero">
       <div class="hero-copy reveal">
-        <p class="eyebrow"><span class="pulse"></span> geniespec 0.1.1 · MIT · build-time only</p>
+        <p class="eyebrow"><span class="pulse"></span> geniespec 0.1.1 · MIT</p>
         <h1>One YAML spec.<br /><span class="gradient-text"><span class="nowrap">Type-correct</span> APIs and clients everywhere.</span></h1>
-        <p class="lede">Describe your <strong>resources</strong> once in an <code>api.yaml</code>. Genie checks the design and generates the <strong>typed server</strong> and <strong>typed clients</strong> from it, so the easy path is also the correct one and the two sides can't drift apart.</p>
-        <p class="live-targets"><span>Live targets</span><b>Python server · pydantic + starlette</b><b>TypeScript client</b><i>the core is language-agnostic</i></p>
+        <p class="lede">Write your resources once. Genie turns them into a <strong>typed server</strong> and <strong>typed clients</strong> that always agree, so the correct API is also the easiest one to build.</p>
         <div class="install">
           <span class="prompt">$</span>
           <code id="install-command">uvx geniespec build --spec api.yaml --target python-server</code>
@@ -70,11 +69,11 @@
         <div class="outputs">
           <div class="window out-window">
             <div class="window-bar"><span></span><span></span><span></span><em>bookshelf_api/v1/internal.py</em></div>
-            <pre class="code" id="hero-python"></pre>
+            <pre class="code" id="hero-python"><span class="tok-comment"># waiting for api.yaml…</span></pre>
           </div>
           <div class="window out-window">
             <div class="window-bar"><span></span><span></span><span></span><em>bookshelf-api/v1/client.ts</em></div>
-            <pre class="code" id="hero-typescript"></pre>
+            <pre class="code" id="hero-typescript"><span class="tok-comment">// waiting for api.yaml…</span></pre>
           </div>
         </div>
       </div>
@@ -82,7 +81,7 @@
 
     <section id="why" class="section letter-section">
       <article class="letter reveal">
-        <svg class="letter-mark" viewBox="0 0 64 64" aria-hidden="true">
+        <svg class="letter-mark" viewBox="0 0 64 64" width="56" height="56" aria-hidden="true">
           <path d="M10 42c6 6 30 6 40 0l6-10h-8c-2-6-8-9-16-9s-14 3-16 9h-2c-4 0-6 3-4 6z" fill="url(#lamp)" />
           <path class="letter-wisp" d="M30 23c-2-6 4-8 2-14 6 4 6 10 2 14z" fill="#39e0c8" />
           <rect x="18" y="46" width="28" height="5" rx="2.5" fill="url(#lamp)" />
@@ -163,13 +162,6 @@
         <div class="route-row" role="row"><span role="cell"><b>SUMMARISE</b> · stream</span><span role="cell"><i class="post">POST</i> /books/{bookId}/summarise</span><span role="cell">summarise_book_v1 → AsyncIterator</span><span role="cell">summariseBook(id, onChunk)</span></div>
         <div class="route-row" role="row"><span role="cell"><b>UPLOAD-COVER</b> · File</span><span role="cell"><i class="post">POST</i> /books/{bookId}/upload-cover</span><span role="cell">upload_cover_book_v1(image: UploadedFile)</span><span role="cell">uploadCoverBook(id, { image })</span></div>
       </div>
-    </section>
-
-    <section class="stats reveal" aria-label="Genie at a glance">
-      <div class="stat"><strong>1</strong><span>source of truth: <code>api.yaml</code></span></div>
-      <div class="stat"><strong>5</strong><span>standard methods: LIST · GET · CREATE · UPDATE · DELETE</span></div>
-      <div class="stat"><strong>2</strong><span>live targets: <code>python-server</code> · <code>typescript-client</code></span></div>
-      <div class="stat"><strong>0</strong><span>generated files in git: output is gitignored</span></div>
     </section>
 
     <section id="pipeline" class="section">
