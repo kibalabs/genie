@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Genie · One YAML spec. Type-correct APIs and clients everywhere.</title>
+  <meta name="description" content="Genie turns a resource-oriented api.yaml into a typed server and typed clients. Inspired by Google's AIP-121. The generator is language-agnostic; Python (pydantic + starlette) and TypeScript targets are live today." />
+  <meta property="og:title" content="Genie · One YAML spec. Type-correct APIs and clients everywhere." />
+  <meta property="og:description" content="Describe resources, their hierarchy and a few standard methods in one api.yaml. Genie checks the design and generates the server and the clients." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://geniespec.com/" />
+  <meta property="og:image" content="https://geniespec.com/assets/banner.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="676" />
+  <meta property="og:video" content="https://geniespec.com/assets/banner.mp4" />
+  <meta property="og:video:type" content="video/mp4" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@krishan711" />
+  <meta name="twitter:image" content="https://geniespec.com/assets/banner.png" />
+  <meta name="theme-color" content="#07060f" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/assets/icon-dark.png" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <canvas id="stars" aria-hidden="true"></canvas>
+  <div class="aurora" aria-hidden="true"></div>
+
+  <header class="nav">
+    <a class="brand" href="#top" aria-label="Genie home">
+      <img class="brand-wordmark" src="/assets/wordmark-noback-dark.svg" alt="genie" width="135" height="32" />
+    </a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="#why">Why</a>
+      <a href="#principles">Principles</a>
+      <a href="#explorer">Output</a>
+      <a href="#targets">Targets</a>
+      <a href="#watch">Watch</a>
+      <a class="nav-cta" href="https://github.com/kibalabs/genie">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-copy reveal">
+        <p class="eyebrow"><span class="pulse"></span> geniespec 0.1.1 · MIT</p>
+        <h1>One YAML spec.<br /><span class="gradient-text"><span class="nowrap">Type-correct</span> APIs and clients everywhere.</span></h1>
+        <p class="lede">Write your resources once. Genie turns them into a <strong>typed server</strong> and <strong>typed clients</strong> that always agree, so the correct API is also the easiest one to build.</p>
+        <div class="install">
+          <span class="prompt">$</span>
+          <code id="install-command">uvx geniespec build --spec api.yaml --target python-server</code>
+          <button class="copy" type="button" data-copy="install-command" aria-label="Copy install command">copy</button>
+        </div>
+        <div class="hero-actions">
+          <a class="button primary" href="#explorer">See what it generates</a>
+          <a class="button ghost" href="https://pypi.org/project/geniespec/">PyPI</a>
+        </div>
+      </div>
+
+      <div class="hero-stage reveal" role="figure" aria-label="An api.yaml being turned into Python and TypeScript">
+        <div class="window spec-window">
+          <div class="window-bar"><span></span><span></span><span></span><em>api.yaml</em></div>
+          <pre class="code" id="hero-spec"></pre>
+        </div>
+        <div class="lamp-beam" aria-hidden="true">
+          <div class="beam"></div>
+          <div class="spark s1"></div><div class="spark s2"></div><div class="spark s3"></div>
+        </div>
+        <div class="outputs">
+          <div class="window out-window">
+            <div class="window-bar"><span></span><span></span><span></span><em>bookshelf_api/v1/internal.py</em></div>
+            <pre class="code" id="hero-python"><span class="tok-comment"># waiting for api.yaml…</span></pre>
+          </div>
+          <div class="window out-window">
+            <div class="window-bar"><span></span><span></span><span></span><em>bookshelf-api/v1/client.ts</em></div>
+            <pre class="code" id="hero-typescript"><span class="tok-comment">// waiting for api.yaml…</span></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="why" class="section letter-section">
+      <article class="letter reveal">
+        <svg class="letter-mark" viewBox="55 55 402 402" width="64" height="64" aria-hidden="true">
+          <defs>
+            <linearGradient id="letter-mark-gradient" x1="60" y1="460" x2="460" y2="60" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#9d6bff" />
+              <stop offset="1" stop-color="#2fd9c0" />
+            </linearGradient>
+          </defs>
+          <g fill="none" stroke="url(#letter-mark-gradient)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M160 96 C112 96 112 128 112 168 L112 210 C112 238 98 256 72 256 C98 256 112 274 112 302 L112 344 C112 384 112 416 160 416" />
+            <path d="M352 96 C400 96 400 128 400 168 L400 210 C400 238 414 256 440 256 C414 256 400 274 400 302 L400 344 C400 384 400 416 352 416" />
+          </g>
+          <path class="letter-sparkle" fill="url(#letter-mark-gradient)" d="M256 160 C264 222 290 248 352 256 C290 264 264 290 256 352 C248 290 222 264 160 256 C222 248 248 222 256 160 Z" />
+        </svg>
+        <p>Hi, I'm Krishan.</p>
+        <p>I've worked at a lot of companies, and I've built thousands of APIs. Back then we wrote every one of them by hand.</p>
+        <p>Now, with agents, I can write thousands in a day.</p>
+        <p>But things get messy quickly. When an API doesn't follow the core resource-oriented principles, every endpoint ends up with its own shape. That causes pain and confusion for everyone who calls it, and for everyone who has to change it later.</p>
+        <p>A clean, clear, resource-based API is so much easier to maintain. You can guess the route. You know what you'll get back.</p>
+        <p>That's why I built Genie. You describe your resources once, and Genie keeps every endpoint on the same rules, whether a person or an agent wrote it.</p>
+        <footer class="letter-sign">
+          <span class="signature">Krishan</span>
+          <small><a href="https://x.com/krishan711">@krishan711</a></small>
+        </footer>
+      </article>
+    </section>
+
+    <section id="principles" class="section">
+      <div class="section-head reveal">
+        <p class="eyebrow">Inspired by AIP-121</p>
+        <h2>The design rules live in the generator</h2>
+        <p>Genie follows Google's <a href="https://google.aip.dev/121">AIP-121: Resource-oriented design</a>. An API is made of named resources (nouns) and the hierarchy between them, with a small number of standard methods (verbs) and custom methods for whatever doesn't fit. In Genie those ideas are the shape of the spec: routes, names and types are derived from it, and the build rejects specs that break the rules.</p>
+      </div>
+      <div class="principle-grid">
+        <article class="principle reveal">
+          <span class="principle-index">01</span>
+          <h3>Resources are nouns</h3>
+          <p>Each resource has a single name, a collection name and a primary attribute called <code>&lt;resource&gt;-id</code>. Paths come from those names, so you never write one.</p>
+          <code class="principle-sample">Book · Books · book-id → /books/{bookId}</code>
+        </article>
+        <article class="principle reveal">
+          <span class="principle-index">02</span>
+          <h3>Hierarchy, not ad hoc paths</h3>
+          <p><code>parentResource: Shelf</code> nests books under shelves. Routes, method names and ids all follow the hierarchy.</p>
+          <code class="principle-sample">/shelves/{shelfId}/books/{shelfBookId}</code>
+        </article>
+        <article class="principle reveal">
+          <span class="principle-index">03</span>
+          <h3>Standard methods first</h3>
+          <p>LIST, GET, CREATE, UPDATE and DELETE have fixed HTTP methods and routes. Most of an API should be these five.</p>
+          <code class="principle-sample">GET · GET · POST · PATCH · DELETE</code>
+        </article>
+        <article class="principle reveal">
+          <span class="principle-index">04</span>
+          <h3>Custom methods when needed</h3>
+          <p>Anything else is a named action on one resource or on the whole collection. <a href="https://google.aip.dev/136">AIP-136</a> puts the verb after a colon; Genie puts it in the path.</p>
+          <code class="principle-sample">MOVE → POST …/books/{shelfBookId}/move</code>
+        </article>
+        <article class="principle reveal">
+          <span class="principle-index">05</span>
+          <h3>One shape per resource</h3>
+          <p>LIST, GET, CREATE and UPDATE all return the same resource class, so a client never sees two versions of a book.</p>
+          <code class="principle-sample">shelfBook: ShelfBookV1</code>
+        </article>
+        <article class="principle reveal">
+          <span class="principle-index">06</span>
+          <h3>Typed all the way down</h3>
+          <p>Every field has a type, nullability and a required flag. Enums, oneOfs and files are types too, and the server rejects values that don't match.</p>
+          <code class="principle-sample">status: ReadingStatus · isNullable: true</code>
+        </article>
+      </div>
+    </section>
+
+    <section class="section routes-section">
+      <div class="section-head reveal">
+        <p class="eyebrow">Names are derived, not declared</p>
+        <h2>Every method becomes a route and typed code on both sides</h2>
+        <p>Resource and action names decide the HTTP route, the method you implement on the server and the method you call on the client. Every target uses the same rule; here it is for the two live ones.</p>
+      </div>
+      <div class="route-table reveal" role="table" aria-label="Transitions mapped to routes and methods">
+        <div class="route-row head" role="row">
+          <span role="columnheader">Spec</span><span role="columnheader">Route</span><span role="columnheader">Python internal</span><span role="columnheader">TypeScript client</span>
+        </div>
+        <div class="route-row" role="row"><span role="cell"><b>LIST</b> Book</span><span role="cell"><i class="get">GET</i> /books</span><span role="cell">list_books_v1</span><span role="cell">listBooks</span></div>
+        <div class="route-row" role="row"><span role="cell"><b>GET</b> Book</span><span role="cell"><i class="get">GET</i> /books/{bookId}</span><span role="cell">get_book_v1</span><span role="cell">getBook</span></div>
+        <div class="route-row" role="row"><span role="cell"><b>CREATE</b> Book</span><span role="cell"><i class="post">POST</i> /books</span><span role="cell">create_book_v1</span><span role="cell">createBook</span></div>
+        <div class="route-row" role="row"><span role="cell"><b>UPDATE</b> Book</span><span role="cell"><i class="patch">PATCH</i> /books/{bookId}</span><span role="cell">update_book_v1</span><span role="cell">updateBook</span></div>
+        <div class="route-row" role="row"><span role="cell"><b>SUMMARISE</b> · stream</span><span role="cell"><i class="post">POST</i> /books/{bookId}/summarise</span><span role="cell">summarise_book_v1 → AsyncIterator</span><span role="cell">summariseBook(id, onChunk)</span></div>
+        <div class="route-row" role="row"><span role="cell"><b>UPLOAD-COVER</b> · File</span><span role="cell"><i class="post">POST</i> /books/{bookId}/upload-cover</span><span role="cell">upload_cover_book_v1(image: UploadedFile)</span><span role="cell">uploadCoverBook(id, { image })</span></div>
+      </div>
+    </section>
+
+    <section id="pipeline" class="section">
+      <div class="section-head reveal">
+        <p class="eyebrow">How it works</p>
+        <h2>From YAML to typed code in five stages</h2>
+        <p>Each build runs the same pipeline. An invalid spec stops at the first stage that rejects it, so you never get half-generated code.</p>
+      </div>
+      <div class="pipeline reveal">
+        <div class="track" aria-hidden="true"><div class="comet"></div></div>
+        <article class="stage">
+          <div class="stage-icon">01</div>
+          <h3>Syntactic check</h3>
+          <p>The raw YAML is checked against a JSON Schema for names, patterns and value types, so <code>action: FOO_BAR</code> and stray keys fail early.</p>
+          <code>jsonschema · api_schema.yaml</code>
+        </article>
+        <article class="stage">
+          <div class="stage-icon">02</div>
+          <h3>Parse</h3>
+          <p>The spec is loaded into pydantic models: resources, attributes, transitions, enums, oneOfs and exceptions.</p>
+          <code>KibaApi(**apiYaml)</code>
+        </article>
+        <article class="stage">
+          <div class="stage-icon">03</div>
+          <h3>Semantic check</h3>
+          <p>Genie resolves routes and names, then rejects duplicate routes, operation-name clashes, reserved words, bad primary keys and invalid oneOfs.</p>
+          <code>SemanticValidationException</code>
+        </article>
+        <article class="stage">
+          <div class="stage-icon">04</div>
+          <h3>Render</h3>
+          <p>A target-specific language definition decides types, names and serialisation, and Jinja templates write the files.</p>
+          <code>templates/&lt;target&gt;/*.j2</code>
+        </article>
+        <article class="stage">
+          <div class="stage-icon">05</div>
+          <h3>Diff-aware write</h3>
+          <p>Only files whose content changed are rewritten, and files the spec no longer produces are removed. Your dev server only sees real changes.</p>
+          <code>(1 files changed)</code>
+        </article>
+      </div>
+    </section>
+
+    <section id="explorer" class="section">
+      <div class="section-head reveal">
+        <p class="eyebrow">Real output</p>
+        <h2>Open the files it writes</h2>
+        <p>These files were generated by <code>geniespec 0.1.1</code> from the spec in the first tab. Only <code>api.py</code> is trimmed, where marked. On the server you implement one abstract class; the client is ready to call.</p>
+      </div>
+      <div class="explorer reveal">
+        <div class="tabs" role="tablist" aria-label="Generated files">
+          <button type="button" role="tab" class="tab" aria-selected="true" data-file="api-yaml" data-lang="yaml">api.yaml</button>
+          <button type="button" role="tab" class="tab" aria-selected="false" data-file="resources-py" data-lang="python">resources.py</button>
+          <button type="button" role="tab" class="tab" aria-selected="false" data-file="internal-py" data-lang="python">internal.py</button>
+          <button type="button" role="tab" class="tab" aria-selected="false" data-file="api-py" data-lang="python">api.py</button>
+          <button type="button" role="tab" class="tab" aria-selected="false" data-file="client-ts" data-lang="typescript">client.ts</button>
+          <button type="button" role="tab" class="tab" aria-selected="false" data-file="tree" data-lang="tree">output tree</button>
+        </div>
+        <div class="explorer-body">
+          <pre class="code" id="explorer-code" role="tabpanel"></pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="targets" class="section">
+      <div class="section-head reveal">
+        <p class="eyebrow">Language-agnostic core</p>
+        <h2>Any language. Two are live today.</h2>
+        <p>The spec says nothing about Python or TypeScript. Genie's core validates it and works out every resource, route, method name and type. A target then renders that model, and a target is only a language definition (type names, casing, reserved names) plus a folder of Jinja templates.</p>
+      </div>
+      <div class="target-flow reveal" role="figure" aria-label="api.yaml flows through the core into each target">
+        <div class="flow-node"><b>api.yaml</b><small>resources · methods · types</small></div>
+        <div class="flow-link" aria-hidden="true"><span></span></div>
+        <div class="flow-node core"><b>core</b><small>validate · routes · names · types</small></div>
+        <div class="flow-link" aria-hidden="true"><span></span></div>
+        <div class="flow-targets">
+          <div class="flow-target live"><b>python-server</b><small>pydantic + starlette</small></div>
+          <div class="flow-target live"><b>typescript-client</b><small>@kibalabs/core</small></div>
+          <div class="flow-target next"><b>next target</b><small>language definition + templates</small></div>
+        </div>
+      </div>
+      <div class="target-grid">
+        <article class="target-card reveal">
+          <p class="target-status"><span class="pulse"></span> Live</p>
+          <h3>python-server</h3>
+          <p>pydantic resource models, starlette routes and one abstract class to implement. Request parsing, validation, auth hooks and streaming are generated.</p>
+          <code>&lt;service&gt;_api/v1/</code>
+        </article>
+        <article class="target-card reveal">
+          <p class="target-status"><span class="pulse"></span> Live</p>
+          <h3>typescript-client</h3>
+          <p>A typed client with a method per operation, resource classes, enum types and oneOf parsers, built on <code>@kibalabs/core</code>'s <code>ServiceClient</code>.</p>
+          <code>&lt;service&gt;-api/v1/</code>
+        </article>
+        <article class="target-card next reveal">
+          <p class="target-status">Bring your own</p>
+          <h3>Templates all the way</h3>
+          <p>The bundled templates are one kibalabs-style example. kiba-core, pydantic and starlette are choices the templates make, not the core, so a different stack or a new language is a new set of templates.</p>
+          <code>LanguageDefinition + templates/&lt;target&gt;/*.j2</code>
+        </article>
+      </div>
+    </section>
+
+    <section id="types" class="section">
+      <div class="section-head reveal">
+        <p class="eyebrow">Type system</p>
+        <h2>One type system, rendered per target</h2>
+        <p>Spec types are language-neutral and each target decides how to render them. These are the two live targets: nullable fields become <code>| None</code> in Python and <code>| null</code> in TypeScript, and dates are parsed and serialised for you.</p>
+        <p class="legend"><span class="py">python-server</span><span class="ts">typescript-client</span></p>
+      </div>
+      <div class="type-grid">
+        <div class="type-card reveal"><h3>String · Integer · Float · Boolean</h3><p><code>str</code> <code>int</code> <code>float</code> <code>bool</code></p><p><code>string</code> <code>number</code> <code>boolean</code></p></div>
+        <div class="type-card reveal"><h3>Date · Datetime</h3><p><code>datetime.date</code> <code>datetime.datetime</code></p><p><code>Date</code> via <code>dateFromString</code> / <code>dateToString</code></p></div>
+        <div class="type-card reveal"><h3>List</h3><p><code>collections.abc.Sequence[T]</code></p><p><code>T[]</code></p></div>
+        <div class="type-card reveal"><h3>Mapping</h3><p><code>collections.abc.Mapping[K, V]</code></p><p><code>Record&lt;string, V&gt;</code></p></div>
+        <div class="type-card reveal accent"><h3>Json</h3><p><code>pydantic.JsonValue</code></p><p><code>JsonValue</code> (recursive union)</p><small>For payloads you don't want to model, such as an LLM tool result or a third-party webhook body.</small></div>
+        <div class="type-card reveal accent"><h3>Enum</h3><p><code>ReadingStatusV1 = typing.Literal['want-to-read', …]</code></p><p><code>type ReadingStatusV1 = 'want-to-read' | …</code></p><small>Named at the top level or inline with <code>enumValues</code>. The server rejects other values with a 400.</small></div>
+        <div class="type-card reveal accent"><h3>OneOf</h3><p><code>Annotated[A | B, Field(discriminator='kind')]</code></p><p><code>A | B</code> + <code>xV1FromObject()</code></p><small>Each member is a resource with a single-value enum discriminator.</small></div>
+        <div class="type-card reveal accent"><h3>File</h3><p><code>UploadedFile(filename, contentType, content)</code></p><p><code>File</code> sent as <code>multipart/form-data</code></p><small>POST only. The other fields go in the same form.</small></div>
+      </div>
+    </section>
+
+    <section class="section features">
+      <div class="section-head reveal">
+        <p class="eyebrow">The details</p>
+        <h2>The edge cases are covered too</h2>
+      </div>
+      <div class="feature-grid">
+        <article class="feature reveal">
+          <h3>Streams</h3>
+          <p><code>responseType: stream</code> gives an async generator on the server, sent as <code>application/x-ndjson</code>. The client gets a callback per item.</p>
+        </article>
+        <article class="feature reveal">
+          <h3>Partial updates that mean it</h3>
+          <p>UPDATE fields are <code>UpdateValue[T] = UNDEFINED</code>, so "not sent" and "set to null" stay different from the client all the way to your code.</p>
+        </article>
+        <article class="feature reveal">
+          <h3>Renames fail type-checking</h3>
+          <p>Internal methods take keyword-only parameters. Rename a parameter in your implementation and mypy reports an incompatible override.</p>
+        </article>
+        <article class="feature reveal">
+          <h3>Auth per transition</h3>
+          <p><code>defaultAuthentication</code> plus a per-transition <code>authentication</code>. Routes call your <code>RouteAuthResolver</code> with the policy name; <code>none</code> makes a route public.</p>
+        </article>
+        <article class="feature reveal">
+          <h3>Redirects and webhooks</h3>
+          <p><code>responseType: redirect</code> returns a location the server answers with a 302. <code>source: query-parameters</code> collects every query parameter for third-party callbacks.</p>
+        </article>
+        <article class="feature reveal">
+          <h3>Versioned by design</h3>
+          <p>Each major version writes its own package, e.g. <code>bookshelf_api/v1</code>, and every class carries the suffix (<code>BookV1</code>), so two versions can be served side by side.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="watch" class="section watch-section">
+      <div class="section-head reveal">
+        <p class="eyebrow">Watch mode</p>
+        <h2>Edit the spec while the app is running</h2>
+        <p><code>geniespec watch</code> builds once, starts your command, rebuilds on every save and passes your command's exit code through. If the spec is invalid it keeps the last good output.</p>
+      </div>
+      <div class="terminal reveal" role="figure" aria-label="Animated terminal showing geniespec watch">
+        <div class="window-bar"><span></span><span></span><span></span><em>zsh</em></div>
+        <pre id="watch-terminal"></pre>
+      </div>
+      <div class="error-wall reveal" role="figure" aria-label="Examples of validation errors">
+        <p class="error-title">Errors name the spec field that caused them:</p>
+        <ul>
+          <li><span>SemanticValidationException</span> Primary attribute of Book must be book-id, found id</li>
+          <li><span>SemanticValidationException</span> "default" is not a valid TypeScript name (attribute of Book)</li>
+          <li><span>SemanticValidationException</span> upload: only POST transitions can have File fields</li>
+          <li><span>SemanticValidationException</span> kind of Graph must be a non-nullable Enum with one value to be part of Content</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section cta reveal">
+      <h2>Rub the lamp.</h2>
+      <p>Add <code>geniespec</code> as a dev dependency, gitignore the output folder, and run it from your build scripts.</p>
+      <div class="install large">
+        <span class="prompt">$</span>
+        <code id="cta-command">uvx geniespec watch --spec api.yaml --target typescript-client -- npm start</code>
+        <button class="copy" type="button" data-copy="cta-command" aria-label="Copy watch command">copy</button>
+      </div>
+      <div class="hero-actions centered">
+        <a class="button primary" href="https://github.com/kibalabs/genie">Read the source</a>
+        <a class="button ghost" href="https://github.com/kibalabs/genie/blob/main/README.md">Docs</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Genie is MIT licensed and built by <a href="https://www.kibalabs.com">Kiba Labs</a>.</span>
+    <span><a href="https://github.com/kibalabs/genie">GitHub</a> · <a href="https://pypi.org/project/geniespec/">PyPI</a></span>
+  </footer>
+
+  <script type="text/plain" id="file-api-yaml">version: 1.0.0
+serviceName: bookshelf
+pythonClientPackageName: bookshelf-api-client
+typescriptClientPackageName: '@acme/bookshelf-api-client'
+defaultAuthentication: reader
+enums:
+  - name: ReadingStatus
+    values: [want-to-read, reading, finished]
+resources:
+  - singleName: Book
+    collectionName: Books
+    attributes:
+      - name: book-id
+        type: String
+        isPrimary: true
+      - name: title
+        type: String
+        isSettable: true
+        isUpdatable: true
+      - name: status
+        type: ReadingStatus
+        isSettable: true
+        isUpdatable: true
+      - name: published-date
+        type: Date
+        isNullable: true
+        isSettable: true
+    transitions:
+      - action: LIST
+        requestFields:
+          - name: status
+            type: ReadingStatus
+      - action: GET
+      - action: CREATE
+      - action: UPDATE
+      - action: SUMMARISE
+        operatesOn: individual
+        responseType: stream
+        responseField:
+          name: chunk
+          type: String
+      - action: UPLOAD-COVER
+        operatesOn: individual
+        requestFields:
+          - name: image
+            type: File
+            isRequired: true</script>
+
+  <script type="text/plain" id="file-resources-py"># --- THIS FILE HAS BEEN AUTOGENERATED, DO NOT MODIFY MANUALLY ---
+from __future__ import annotations
+
+import collections.abc
+import datetime
+import typing
+
+from pydantic import BaseModel
+
+ReadingStatusV1 = typing.Literal['want-to-read', 'reading', 'finished']
+
+
+class BookV1(BaseModel):
+    bookId: str
+    title: str
+    status: ReadingStatusV1
+    publishedDate: datetime.date | None</script>
+
+  <script type="text/plain" id="file-internal-py"># --- THIS FILE HAS BEEN AUTOGENERATED, DO NOT MODIFY MANUALLY ---
+import abc
+import datetime
+import collections.abc
+
+from . import resources
+from core.util.typing_util import UNDEFINED, UpdateValue
+from core.api.uploaded_file import UploadedFile
+
+
+class BookshelfApiV1Internal(abc.ABC):
+
+    @abc.abstractmethod
+    async def list_books_v1(
+        self,
+        *,
+        status: resources.ReadingStatusV1 | None,
+    ) -> collections.abc.Sequence[resources.BookV1]:
+        ...
+
+    @abc.abstractmethod
+    async def get_book_v1(
+        self,
+        *,
+        bookId: str,
+    ) -> resources.BookV1:
+        ...
+
+    @abc.abstractmethod
+    async def create_book_v1(
+        self,
+        *,
+        title: str,
+        status: resources.ReadingStatusV1,
+        publishedDate: datetime.date | None,
+    ) -> resources.BookV1:
+        ...
+
+    @abc.abstractmethod
+    async def update_book_v1(
+        self,
+        *,
+        bookId: str,
+        title: UpdateValue[str] = UNDEFINED,
+        status: UpdateValue[resources.ReadingStatusV1] = UNDEFINED,
+    ) -> resources.BookV1:
+        ...
+
+    @abc.abstractmethod
+    def summarise_book_v1(
+        self,
+        *,
+        bookId: str,
+    ) -> collections.abc.AsyncIterator[str]:
+        ...
+
+    @abc.abstractmethod
+    async def upload_cover_book_v1(
+        self,
+        *,
+        bookId: str,
+        image: UploadedFile,
+    ) -> None:
+        ...</script>
+
+  <script type="text/plain" id="file-api-py"># --- THIS FILE HAS BEEN AUTOGENERATED, DO NOT MODIFY MANUALLY ---
+# ruff: noqa: ARG001
+import collections.abc
+import datetime
+
+from core.api.api_request import KibaApiRequest
+from core.api.route import route
+from core.api.route_auth import RouteAuthResolver
+from core.http.rest_method import RestMethod
+from starlette.routing import BaseRoute
+from starlette.routing import Route
+from . import endpoints
+from .internal import BookshelfApiV1Internal
+def create_routes(internal: BookshelfApiV1Internal, authResolver: RouteAuthResolver) -> list[BaseRoute]:
+
+
+    @route(requestType=endpoints.ListBooksRequest, responseType=endpoints.ListBooksResponse, authResolver=authResolver, auth='reader')
+    async def list_books(request: KibaApiRequest[endpoints.ListBooksRequest]) -> endpoints.ListBooksResponse:
+        books = await internal.list_books_v1(
+            status=request.data.status,
+        )
+        return endpoints.ListBooksResponse(books=books)
+
+    @route(requestType=endpoints.SummariseBookRequest, responseType=endpoints.SummariseBookResponse, isStreaming=True, authResolver=authResolver, auth='reader')
+    async def summarise_book(request: KibaApiRequest[endpoints.SummariseBookRequest]) -> collections.abc.AsyncIterator[endpoints.SummariseBookResponse]:
+        async for item in internal.summarise_book_v1(
+            bookId=request.data.bookId,
+        ):
+            yield endpoints.SummariseBookResponse(chunk=item)
+
+    # … one handler per transition …
+
+    return [
+        Route(path='/books', methods=[RestMethod.GET], endpoint=list_books),
+        Route(path='/books', methods=[RestMethod.POST], endpoint=create_book),
+        Route(path='/books/{bookId:str}', methods=[RestMethod.GET], endpoint=get_book),
+        Route(path='/books/{bookId:str}', methods=[RestMethod.PATCH], endpoint=update_book),
+        Route(path='/books/{bookId:str}/summarise', methods=[RestMethod.POST], endpoint=summarise_book),
+        Route(path='/books/{bookId:str}/upload-cover', methods=[RestMethod.POST], endpoint=upload_cover_book),
+    ]</script>
+
+  <script type="text/plain" id="file-client-ts">// --- THIS FILE HAS BEEN AUTOGENERATED, DO NOT MODIFY MANUALLY ---
+import { RestMethod, ServiceClient } from '@kibalabs/core';
+
+import * as Endpoints from './endpoints';
+import * as Resources from './resources';
+
+export class BookshelfApiV1Client extends ServiceClient {
+  public listBooks = async (params: Endpoints.ListBooksParams = {}): Promise<Resources.BookV1[]> => {
+    const response = await this.makeRequest(RestMethod.GET, 'books', new Endpoints.ListBooksRequest(params), Endpoints.ListBooksResponse);
+    return response.books;
+  };
+
+  public getBook = async (bookId: string): Promise<Resources.BookV1> => {
+    const response = await this.makeRequest(RestMethod.GET, `books/${encodeURIComponent(bookId)}`, undefined, Endpoints.GetBookResponse);
+    return response.book;
+  };
+
+  public createBook = async (params: Endpoints.CreateBookParams): Promise<Resources.BookV1> => {
+    const response = await this.makeRequest(RestMethod.POST, 'books', new Endpoints.CreateBookRequest(params), Endpoints.CreateBookResponse);
+    return response.book;
+  };
+
+  public updateBook = async (bookId: string, params: Endpoints.UpdateBookParams = {}): Promise<Resources.BookV1> => {
+    const response = await this.makeRequest(RestMethod.PATCH, `books/${encodeURIComponent(bookId)}`, new Endpoints.UpdateBookRequest(params), Endpoints.UpdateBookResponse);
+    return response.book;
+  };
+
+  public summariseBook = async (bookId: string, onChunk: (chunk: string) => void): Promise<void> => {
+    await this.makeStreamingRequest(RestMethod.POST, `books/${encodeURIComponent(bookId)}/summarise`, undefined, Endpoints.SummariseBookResponse, (response: Endpoints.SummariseBookResponse): void => {
+      onChunk(response.chunk);
+    });
+  };
+
+  public uploadCoverBook = async (bookId: string, params: Endpoints.UploadCoverBookParams): Promise<void> => {
+    await this.requester.makeFormRequest(`${this.baseUrl}/books/${encodeURIComponent(bookId)}/upload-cover`, new Endpoints.UploadCoverBookRequest(params).toFormData());
+  };
+}</script>
+
+  <script type="text/plain" id="file-tree">.
+├── api.yaml
+├── bookshelf_api/              # --target python-server
+│   ├── __init__.py
+│   └── v1/
+│       ├── __init__.py
+│       ├── api.py              # create_routes(internal, authResolver)
+│       ├── endpoints.py        # request / response models
+│       ├── exceptions.py       # typed API exceptions
+│       ├── internal.py         # the abstract class you implement
+│       └── resources.py        # pydantic resources, enums, oneOfs
+└── bookshelf-api/              # --target typescript-client
+    └── v1/
+        ├── client.ts           # BookshelfApiV1Client extends ServiceClient
+        ├── endpoints.ts        # params, request and response classes
+        ├── index.ts
+        └── resources.ts        # classes with fromObject / toObject</script>
+
+  <script src="/main.js" defer></script>
+</body>
+</html>
