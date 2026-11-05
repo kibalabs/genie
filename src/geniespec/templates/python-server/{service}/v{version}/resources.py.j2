@@ -7,14 +7,14 @@ import collections.abc
 {% if target.module_requires(api=api, module='resources', requirement='datetime') %}
 import datetime
 {% endif %}
-{% if target.resources_require_typing(api=api) or target.requires_big_int(api=api) %}
+{% if target.resources_require_typing(api=api) %}
 import typing
 {% endif %}
 {% if target.module_requires(api=api, module='resources', requirement='uuid') %}
 import uuid
 {% endif %}
 
-{% if target.module_requires(api=api, module='resources', requirement='json') or api.oneOfs or target.resources_require_field(api=api) or target.requires_big_int(api=api) %}
+{% if target.resources_require_pydantic(api=api) %}
 import pydantic
 {% endif %}
 {% if api.resources %}

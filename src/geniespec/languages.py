@@ -422,10 +422,6 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
         return self.requires_optional_field_default(api=api) or hasRequestDescriptions or hasResponseDescriptions
 
     @staticmethod
-    def resources_require_field(api: RenderableApi) -> bool:
-        return any(attribute.description is not None for resource in api.resources for attribute in resource.attributes)
-
-    @staticmethod
     def _field_default(default: str | None, description: str | None, fieldFunction: str = 'Field', shouldUseField: bool = False) -> str:
         if description is None and not shouldUseField:
             return '' if default is None else f' = {default}'
@@ -505,7 +501,12 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
         return any(part.rawType == PrimitiveTypes.BIG_INT for module in ('resources', 'internal', 'exceptions') for fieldType in self._module_field_types(api=api, module=module) for part in self._type_parts(renderableType=fieldType))
 
     def resources_require_typing(self, api: RenderableApi) -> bool:
-        return len(api.enums) > 0 or len(api.oneOfs) > 0 or any(self.is_inline_enum(renderableType=attribute.fieldType) for resource in api.resources for attribute in resource.attributes)
+        hasInlineEnums = any(self.is_inline_enum(renderableType=attribute.fieldType) for resource in api.resources for attribute in resource.attributes)
+        return len(api.enums) > 0 or len(api.oneOfs) > 0 or hasInlineEnums or self.requires_big_int(api=api)
+
+    def resources_require_pydantic(self, api: RenderableApi) -> bool:
+        hasDescriptions = any(attribute.description is not None for resource in api.resources for attribute in resource.attributes)
+        return len(api.oneOfs) > 0 or hasDescriptions or self.module_requires(api=api, module='resources', requirement='json') or self.requires_big_int(api=api)
 
     def one_of_alias(self, oneOf: RenderableOneOf, apiVersion: Version) -> str:
         return f'typing.Annotated[{" | ".join(self.one_of_member_class_names(oneOf=oneOf, apiVersion=apiVersion))}, pydantic.Field(discriminator={self.identifier(name=oneOf.discriminator)!r})]'
