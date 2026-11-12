@@ -150,9 +150,26 @@ transitions:
     assert (defaultSort, calls['search_v1']['sort']) == ('recent', 'oldest')
 
 
-def test_bounds_clamp_values_and_skip_omitted_fields(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_constraints_reject_values_outside_them(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _generate(
         specYaml="""
+resources:
+  - singleName: Chain
+    collectionName: Chains
+    attributes:
+      - name: chain-id
+        type: Integer
+        isPrimary: true
+        minValue: 1
+        maxValue: 2147483647
+    transitions:
+      - action: GET
+  - singleName: Detail
+    collectionName: Details
+    attributes:
+      - name: label
+        type: String
+        maxLength: 3
 transitions:
   - action: SEARCH
     requestFields:
@@ -160,17 +177,37 @@ transitions:
         type: Integer
         minValue: 1
         maxValue: 100
+      - name: preset
+        type: String
+        pattern: '^[a-z]+$'
+      - name: tags
+        type: List
+        listValueTypes:
+          - String
+        minLength: 1
+        maxLength: 2
+      - name: details
+        type: List
+        listValueTypes:
+          - Detail
 """,
         outputDirectory=tmp_path,
         monkeypatch=monkeypatch,
     )
     calls: dict[str, dict[str, object]] = {}
-    client = _client(calls=calls, returnValues={})
-    receivedLimits = []
-    for body in ({}, {'limit': 1000}, {'limit': 0}, {'limit': 5}):
-        client.post('/search', json=body)
-        receivedLimits.append(calls['search_v1']['limit'])
-    assert receivedLimits == [None, 100, 1, 5]
+    client = _client(calls=calls, returnValues={'get_chain_v1': _module('resources').ChainV1(chainId=8453)})
+    client.post('/search', json={})
+    assert calls == {'search_v1': {'limit': None, 'preset': None, 'tags': None, 'details': None}}
+    client.post('/search', json={'limit': 100, 'preset': 'abc', 'tags': ['a', 'b'], 'details': [{'label': 'abc'}]})
+    client.get('/chains/8453')
+    assert calls == {'search_v1': {'limit': 100, 'preset': 'abc', 'tags': ['a', 'b'], 'details': [_module('resources').DetailV1(label='abc')]}, 'get_chain_v1': {'chainId': 8453}}
+    invalidBodies = [{'limit': 0}, {'limit': 101}, {'preset': 'Abc'}, {'tags': []}, {'tags': ['a', 'b', 'c']}, {'details': [{'label': 'abcd'}]}]
+    for body in invalidBodies:
+        with pytest.raises(BadRequestException):
+            client.post('/search', json=body)
+    for chainId in (0, 2147483648):
+        with pytest.raises(BadRequestException):
+            client.get(f'/chains/{chainId}')
 
 
 def test_mapping_types_work_in_parameters_requests_and_responses(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1792,6 +1829,38 @@ resources:
 """,
             ['Asset can only have isUniqueInParent attributes when it is a (not one-to-one) child resource'],
             id='unique-in-parent-without-parent',
+        ),
+        pytest.param(
+            """
+transitions:
+  - action: SEARCH
+    requestFields:
+      - name: query
+        type: String
+        minValue: 1
+      - name: limit
+        type: Integer
+        pattern: '^[0-9]+$'
+        maxLength: 3
+      - name: page
+        type: Integer
+        minValue: 5
+        maxValue: 1
+      - name: tags
+        type: List
+        listValueTypes:
+          - String
+        minLength: 3
+        maxLength: 2
+""",
+            [
+                'query on SEARCH: minValue and maxValue need a number type, not String',
+                'limit on SEARCH: pattern needs a String type, not Integer',
+                'limit on SEARCH: minLength and maxLength need a String or List type, not Integer',
+                'page on SEARCH: minValue is greater than maxValue',
+                'tags on SEARCH: minLength is greater than maxLength',
+            ],
+            id='misused-constraints',
         ),
     ],
 )

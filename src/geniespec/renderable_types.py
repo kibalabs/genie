@@ -130,6 +130,11 @@ class RenderableField(BaseModel):
     fieldType: RenderableType
     defaultValue: str | int | float | bool | None = None
     description: str | None = None
+    minValue: int | float | None = None
+    maxValue: int | float | None = None
+    minLength: int | None = None
+    maxLength: int | None = None
+    pattern: str | None = None
 
 
 class RenderableAttribute(RenderableField):
@@ -194,15 +199,24 @@ class RenderableEndpoint(BaseModel):
     @property
     def urlParameters(self) -> list[RenderableParameter]:  # noqa: N802
         return [
-            RenderableParameter(name=component.attribute.name, fieldType=component.attribute.fieldType, isRequired=True, isDeprecated=False, description=component.attribute.description)
+            RenderableParameter(
+                name=component.attribute.name,
+                fieldType=component.attribute.fieldType,
+                isRequired=True,
+                isDeprecated=False,
+                description=component.attribute.description,
+                minValue=component.attribute.minValue,
+                maxValue=component.attribute.maxValue,
+                minLength=component.attribute.minLength,
+                maxLength=component.attribute.maxLength,
+                pattern=component.attribute.pattern,
+            )
             for component in self.components
             if isinstance(component, ResourceEndpointComponent) and component.attribute is not None
         ]
 
 
 class RenderableParameter(RenderableField):
-    maxValue: float | int | bool | str | None = None
-    minValue: float | int | bool | str | None = None
     isRequired: bool = False
     isDeprecated: bool = False
     source: str = FieldSources.REQUEST

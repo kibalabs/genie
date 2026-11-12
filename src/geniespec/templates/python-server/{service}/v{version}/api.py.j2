@@ -41,15 +41,7 @@ def create_routes(internal: {{ target.internal_class_name(api=api) }}, {% if tar
 {% set param_name = target.identifier(name=parameter.name) %}
 {% if target.requires_parameter_preprocessing(operation=operation, parameter=parameter) %}
         {{ param_name }} = request.data.{{ param_name }}
-{% if parameter.defaultValue is not none and not target.is_undefined_parameter(operation=operation, parameter=parameter) %}
         {{ param_name }} = {{ param_name }} if {{ param_name }} is not None else {{ target.literal(value=parameter.defaultValue) }}
-{% endif %}
-{% if parameter.minValue is not none %}
-        {{ param_name }} = max({{ param_name }}, {{ target.literal(value=parameter.minValue) }}){% if parameter.fieldType.isNullable and parameter.defaultValue is none %} if {{ param_name }} is not None else None{% endif +%}
-{% endif %}
-{% if parameter.maxValue is not none %}
-        {{ param_name }} = min({{ param_name }}, {{ target.literal(value=parameter.maxValue) }}){% if parameter.fieldType.isNullable and parameter.defaultValue is none %} if {{ param_name }} is not None else None{% endif +%}
-{% endif %}
 {% endif %}
 {% endfor %}
 {% if target.is_streaming(operation=operation) %}

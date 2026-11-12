@@ -109,6 +109,20 @@ resources:
 
 Resources are addressed by their primary attribute. A `GET` transition also adds a lookup for each `isUnique` attribute (`/assets/address/{address}`), and, on a child resource, for each `isUniqueInParent` attribute: one that is only unique within its parent, like an asset's address on a chain. Those lookups only exist through the parent (`/chains/{chainId}/assets/address/{address}`), never from root or another ancestor. Lookups share the `GET` transition's documentation fields, with `By<Attribute>` added to its `operationId` (`getAsset` → `getAssetByAddress`).
 
+## Constraints
+
+Attributes and request fields can set `minValue` and `maxValue` (number types), `minLength` and `maxLength` (`String` and `List`) and `pattern` (`String`). Requests that break them are rejected with a 400; a field that is left out isn't checked. On an attribute they apply wherever it's used: as a path id (`/chains/{chainId}`), in `CREATE` and `UPDATE` bodies and when the resource is nested in a request.
+
+```yaml
+attributes:
+  - {name: chain-id, type: Integer, isPrimary: true, minValue: 1, maxValue: 2147483647}
+requestFields:
+  - {name: rule-preset, type: String, pattern: '^[a-z]+$'}
+  - {name: cards, type: List, listValueTypes: [Card], minLength: 1, maxLength: 10}
+```
+
+`python-server` writes them as pydantic constraints (`typing.Annotated[int, Field(ge=1, le=2147483647)]`), so they also show up in the OpenAPI schema.
+
 ## Overrides
 
 `overrides` keep an API that existed before genie working the same way once it moves to genie. They are meant to be dropped in the next major version of that API.

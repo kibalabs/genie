@@ -194,8 +194,11 @@ class Renderer:
                 enumValues=requestField.enumValues,
             ),
             defaultValue=requestField.defaultValue,
-            maxValue=requestField.maxValue,
             minValue=requestField.minValue,
+            maxValue=requestField.maxValue,
+            minLength=requestField.minLength,
+            maxLength=requestField.maxLength,
+            pattern=requestField.pattern,
             isRequired=requestField.isRequired,
             isDeprecated=requestField.isDeprecated,
             source=requestField.source,
@@ -240,6 +243,11 @@ class Renderer:
             isSettable=attribute.isSettable,
             isNullable=attribute.isNullable,
             description=attribute.description,
+            minValue=attribute.minValue,
+            maxValue=attribute.maxValue,
+            minLength=attribute.minLength,
+            maxLength=attribute.maxLength,
+            pattern=attribute.pattern,
         )
 
     def _attribute_to_renderable_parameter(self, attribute: Attribute, isRequired: bool, knownTypeNames: dict[str, str], shouldUseDefault: bool = True) -> RenderableParameter:
@@ -259,7 +267,27 @@ class Renderer:
             isRequired=isRequired,
             isDeprecated=attribute.isDeprecated,
             description=attribute.description,
+            minValue=attribute.minValue,
+            maxValue=attribute.maxValue,
+            minLength=attribute.minLength,
+            maxLength=attribute.maxLength,
+            pattern=attribute.pattern,
         )
+
+    @staticmethod
+    def _constraint_errors(owner: str, field: Attribute | RequestField) -> list[str]:
+        errors: list[str] = []
+        if (field.minValue is not None or field.maxValue is not None) and field.fieldType not in {PrimitiveTypes.INTEGER, PrimitiveTypes.LONG_INTEGER, PrimitiveTypes.FLOAT, PrimitiveTypes.DOUBLE, PrimitiveTypes.BIG_INT}:
+            errors.append(f'{field.name} on {owner}: minValue and maxValue need a number type, not {field.fieldType}')
+        if (field.minLength is not None or field.maxLength is not None) and field.fieldType not in {PrimitiveTypes.STRING, SpecialTypes.LIST}:
+            errors.append(f'{field.name} on {owner}: minLength and maxLength need a String or List type, not {field.fieldType}')
+        if field.pattern is not None and field.fieldType != PrimitiveTypes.STRING:
+            errors.append(f'{field.name} on {owner}: pattern needs a String type, not {field.fieldType}')
+        if field.minValue is not None and field.maxValue is not None and field.minValue > field.maxValue:
+            errors.append(f'{field.name} on {owner}: minValue is greater than maxValue')
+        if field.minLength is not None and field.maxLength is not None and field.minLength > field.maxLength:
+            errors.append(f'{field.name} on {owner}: minLength is greater than maxLength')
+        return errors
 
     @staticmethod
     def _operation_documentation(transition: BaseTransition) -> dict[str, object]:
@@ -472,6 +500,9 @@ class Renderer:
             expectedPrimaryName = f'{RenderableString.from_pascal_case_string(string=fullName).kebabCaseString}-id'
             if resource.transitions and resource.primaryAttribute is not None and not isOneToOne and resource.primaryAttribute.name != expectedPrimaryName:
                 resourceErrors.append(f'Primary attribute of {fullName} must be {expectedPrimaryName}, found {resource.primaryAttribute.name}')
+            resourceErrors += [error for attribute in resource.attributes for error in self._constraint_errors(owner=fullName, field=attribute)]
+            resourceErrors += [error for transition in resource.transitions for requestField in transition.requestFields for error in self._constraint_errors(owner=f'{fullName} {transition.action}', field=requestField)]
+        resourceErrors += [error for transition in api.transitions for requestField in transition.requestFields for error in self._constraint_errors(owner=transition.action, field=requestField)]
         if resourceErrors:
             raise SemanticValidationException(message='\n'.join(resourceErrors))
         renderableOperations = [

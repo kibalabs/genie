@@ -69,7 +69,15 @@ class ApiOneOf(BaseModel):
     types: list[str]
 
 
-class Attribute(BaseModel):
+class FieldConstraints(BaseModel):
+    minValue: int | float | None = None
+    maxValue: int | float | None = None
+    minLength: int | None = None
+    maxLength: int | None = None
+    pattern: str | None = None
+
+
+class Attribute(FieldConstraints):
     name: str
     fieldType: str = pydantic.Field(alias='type')
     listValueTypes: list[str] = []
@@ -102,7 +110,7 @@ class ResponseField(BaseModel):
     description: str | None = None
 
 
-class RequestField(BaseModel):
+class RequestField(FieldConstraints):
     name: str
     fieldType: str = pydantic.Field(alias='type')
     listValueTypes: list[str] = []
@@ -112,8 +120,6 @@ class RequestField(BaseModel):
     isRequired: bool = False
     isDeprecated: bool = False
     defaultValue: str | int | float | bool | None = None
-    maxValue: str | int | float | None = None
-    minValue: str | int | float | None = None
     source: str = FieldSources.REQUEST
     description: str | None = None
 
