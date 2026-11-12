@@ -16,8 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - [MINOR] Added transition `overrides.responseFieldName`, which renames the response field of a `GET`, `LIST`, `CREATE` or `UPDATE` transition
 - [MINOR] Added `isUniqueInParent` on child resource attributes: like `isUnique`, a `GET` transition adds a lookup by the attribute, but only through the parent (`/chains/{chainId}/assets/address/{address}`)
 - [MINOR] `GET` lookups (by `isUnique` or `isUniqueInParent` attributes) share the transition's documentation fields, with `By<Attribute>` added to its `operationId` (`getAsset` → `getAssetByAddress`), so a `GET` on a resource with unique attributes can set an `operationId`
+- [MINOR] Added `minLength`, `maxLength` and `pattern` on request fields, and all of `minValue`, `maxValue`, `minLength`, `maxLength` and `pattern` on attributes (which then apply to path ids, `CREATE`/`UPDATE` bodies and nested request resources). Using one on a type it can't apply to is rejected
 
 ### Changed
+- [MAJOR] Request field `minValue` and `maxValue` reject values outside them with a 400 instead of clamping them, and only take numbers
 - [MINOR] `defaultAuthentication` and `authentication` policy names can contain underscores (e.g. `resource_owner`)
 - [PATCH] Generated `python-server` and `typescript-client` modules only import what they use (for example `datetime`, `collections.abc`, `uuid`, `resources` and kiba-core's `RawObject`), and the `typescript-client` index only re-exports `endpoints` when it has classes
 

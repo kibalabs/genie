@@ -408,7 +408,7 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
         return self.snake_name(name=self._operation_name(operation=operation))
 
     def requires_parameter_preprocessing(self, operation: RenderableOperation, parameter: RenderableParameter) -> bool:
-        return (parameter.defaultValue is not None and not self.is_undefined_parameter(operation=operation, parameter=parameter)) or parameter.minValue is not None or parameter.maxValue is not None
+        return parameter.defaultValue is not None and not self.is_undefined_parameter(operation=operation, parameter=parameter)
 
     def requires_undefined(self, api: RenderableApi) -> bool:
         return any(self.is_undefined_parameter(operation=operation, parameter=parameter) for operation in api.operations for parameter in operation.parameters)
@@ -417,9 +417,22 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
         return any(not self.is_undefined_parameter(operation=operation, parameter=parameter) and not parameter.isRequired and not parameter.fieldType.isNullable for operation in api.operations for parameter in self.request_parameters(operation=operation))
 
     def endpoints_require_field(self, api: RenderableApi) -> bool:
-        hasRequestDescriptions = any(parameter.description is not None for operation in api.operations for parameter in self.request_parameters(operation=operation))
+        hasRequestFieldArguments = any(parameter.description is not None or self._constraint_arguments(field=parameter) for operation in api.operations for parameter in self.request_parameters(operation=operation))
         hasResponseDescriptions = any(field.description is not None for operation in api.operations for field in operation.responseFields or [])
-        return self.requires_optional_field_default(api=api) or hasRequestDescriptions or hasResponseDescriptions
+        return self.requires_optional_field_default(api=api) or hasRequestFieldArguments or hasResponseDescriptions
+
+    @staticmethod
+    def _constraint_arguments(field: RenderableField) -> list[str]:
+        constraints = {'ge': field.minValue, 'le': field.maxValue, 'min_length': field.minLength, 'max_length': field.maxLength, 'pattern': field.pattern}
+        return [f'{name}={value!r}' for name, value in constraints.items() if value is not None]
+
+    def _constrained_type(self, field: RenderableField, apiVersion: Version, fieldFunction: str = 'Field', isLocalReference: bool = False) -> str:
+        constraintArguments = self._constraint_arguments(field=field)
+        if not constraintArguments:
+            return self.type(renderableType=field.fieldType, apiVersion=apiVersion, isLocalReference=isLocalReference)
+        typeName = self.type(renderableType=field.fieldType.model_copy(update={'isNullable': False}), apiVersion=apiVersion, isLocalReference=isLocalReference)
+        constrainedTypeName = f'typing.Annotated[{typeName}, {fieldFunction}({", ".join(constraintArguments)})]'
+        return f'{constrainedTypeName} | None' if field.fieldType.isNullable else constrainedTypeName
 
     @staticmethod
     def _field_default(default: str | None, description: str | None, fieldFunction: str = 'Field', shouldUseField: bool = False) -> str:
@@ -429,7 +442,7 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
         return f' = {fieldFunction}({", ".join(arguments)})'
 
     def request_field_declaration(self, operation: RenderableOperation, parameter: RenderableParameter, apiVersion: Version) -> str:
-        typeName = self.type(renderableType=parameter.fieldType, apiVersion=apiVersion)
+        typeName = self._constrained_type(field=parameter, apiVersion=apiVersion)
         if self.is_undefined_parameter(operation=operation, parameter=parameter):
             return f'UpdateValue[{typeName}]{self._field_default(default="UNDEFINED", description=parameter.description)}'
         if parameter.isRequired:
@@ -442,7 +455,8 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
         return f'{self.type(renderableType=field.fieldType, apiVersion=apiVersion)}{self._field_default(default=None, description=field.description)}'
 
     def attribute_declaration(self, attribute: RenderableAttribute, apiVersion: Version) -> str:
-        return f'{self.type(renderableType=attribute.fieldType, apiVersion=apiVersion, isLocalReference=True)}{self._field_default(default=None, description=attribute.description, fieldFunction="pydantic.Field")}'
+        typeName = self._constrained_type(field=attribute, apiVersion=apiVersion, fieldFunction='pydantic.Field', isLocalReference=True)
+        return f'{typeName}{self._field_default(default=None, description=attribute.description, fieldFunction="pydantic.Field")}'
 
     @staticmethod
     def route_documentation_arguments(operation: RenderableOperation) -> str:
@@ -502,18 +516,20 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
 
     def resources_require_typing(self, api: RenderableApi) -> bool:
         hasInlineEnums = any(self.is_inline_enum(renderableType=attribute.fieldType) for resource in api.resources for attribute in resource.attributes)
-        return len(api.enums) > 0 or len(api.oneOfs) > 0 or hasInlineEnums or self.requires_big_int(api=api)
+        hasConstraints = any(self._constraint_arguments(field=attribute) for resource in api.resources for attribute in resource.attributes)
+        return len(api.enums) > 0 or len(api.oneOfs) > 0 or hasInlineEnums or hasConstraints or self.requires_big_int(api=api)
 
     def resources_require_pydantic(self, api: RenderableApi) -> bool:
-        hasDescriptions = any(attribute.description is not None for resource in api.resources for attribute in resource.attributes)
-        return len(api.oneOfs) > 0 or hasDescriptions or self.module_requires(api=api, module='resources', requirement='json') or self.requires_big_int(api=api)
+        hasFieldArguments = any(attribute.description is not None or self._constraint_arguments(field=attribute) for resource in api.resources for attribute in resource.attributes)
+        return len(api.oneOfs) > 0 or hasFieldArguments or self.module_requires(api=api, module='resources', requirement='json') or self.requires_big_int(api=api)
 
     def one_of_alias(self, oneOf: RenderableOneOf, apiVersion: Version) -> str:
         return f'typing.Annotated[{" | ".join(self.one_of_member_class_names(oneOf=oneOf, apiVersion=apiVersion))}, pydantic.Field(discriminator={self.identifier(name=oneOf.discriminator)!r})]'
 
     def operations_require_typing(self, api: RenderableApi) -> bool:
         fieldTypes = [parameter.fieldType for operation in api.operations for parameter in operation.parameters] + [field.fieldType for operation in api.operations for field in operation.responseFields or []]
-        return any(self.is_inline_enum(renderableType=fieldType) for fieldType in fieldTypes)
+        hasConstraints = any(self._constraint_arguments(field=parameter) for operation in api.operations for parameter in self.request_parameters(operation=operation))
+        return any(self.is_inline_enum(renderableType=fieldType) for fieldType in fieldTypes) or hasConstraints
 
     def requires_uploaded_file(self, api: RenderableApi) -> bool:
         return any(self.is_file_operation(operation=operation) for operation in api.operations)
