@@ -547,7 +547,7 @@ class Renderer:
             enums=[RenderableEnum(name=RenderableString.from_pascal_case_string(string=enum.name), values=enum.values) for enum in api.enums],
             oneOfs=renderableOneOfs,
             rateLimits=[
-                RenderableRateLimit(name=RenderableString.from_kebab_case_string(string=rateLimit.name), perMinute=rateLimit.perMinute, perFiveMinutes=rateLimit.perFiveMinutes, perHour=rateLimit.perHour, perDay=rateLimit.perDay, keyBy=rateLimit.keyBy)
+                RenderableRateLimit(name=RenderableString.from_kebab_case_string(string=rateLimit.name), perMinute=rateLimit.perMinute, perFiveMinutes=rateLimit.perFiveMinutes, perHour=rateLimit.perHour, perDay=rateLimit.perDay, keyBy=rateLimit.keyBy, exemption=rateLimit.exemption)
                 for rateLimit in api.rateLimits
             ],
         )

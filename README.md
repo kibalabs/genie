@@ -81,6 +81,8 @@ transitions:
 
 A rate limit needs at least one of `perMinute`, `perFiveMinutes`, `perHour` and `perDay`. `keyBy` is `user` (the default) or `ip`. Requests over any window are rejected with a 429. Limits keyed by `user` count per authenticated user, so a transition using one needs `authentication`. `python-server` writes each rate limit as a `RATE_LIMIT_<NAME>` kiba-core `RateLimitConfig` and passes it to `route`; keying by `ip` needs kiba-core's `OriginIpMiddleware`. `typescript-client` ignores rate limits.
 
+A rate limit can name an `exemption` (e.g. `exemption: integrator`) for requests it shouldn't count, such as integrators that call from their own servers and so share one IP. `python-server` adds it to the `RateLimitConfig`, and `create_routes` then takes a keyword-only `rateLimitExemptionResolver` (kiba-core's `RateLimitExemptionResolver`). Before counting a request against that limit, kiba-core asks the resolver's `is_rate_limit_exempt(exemption=..., request=...)`, after authentication, so it can use whatever auth set. Exempt requests aren't counted.
+
 ## API docs
 
 Transitions can set `operationId`, `summary`, `description`, `tags` and `extensions`, and attributes, request fields and response fields can set a `description`:
