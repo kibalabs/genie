@@ -404,6 +404,31 @@ def test_typescript_client_parses_and_sends_big_ints_as_strings(tmp_path: pathli
     assert output['calls'][1] == {'method': 'post', 'url': 'https://api.test/v1/positions/p1/withdraw', 'data': {'amountRaw': '123456789012345678901234568'}}
 
 
+def test_typescript_client_names_actions_with_digits(tmp_path: pathlib.Path) -> None:
+    specYaml = """
+transitions:
+  - action: SYNC-V3-WALLETS
+"""
+    script = """
+import { Requester, RestMethod } from '@kibalabs/core';
+
+import { GenieTestApiV1Client } from './genie-test-api/v1';
+
+const calls: Record<string, unknown>[] = [];
+const requester = {
+  makeRequest: async (method: RestMethod, url: string): Promise<{ content: string }> => {
+    calls.push({ method, url });
+    return { content: '{}' };
+  },
+} as unknown as Requester;
+
+await new GenieTestApiV1Client(requester, 'https://api.test/v1').syncV3Wallets();
+console.log(JSON.stringify({ calls }));
+"""
+    output = _run_typescript(specYaml=specYaml, script=script, directory=tmp_path)
+    assert output['calls'] == [{'method': 'post', 'url': 'https://api.test/v1/sync-v3-wallets'}]
+
+
 def test_typescript_client_rejects_names_reserved_in_typescript(tmp_path: pathlib.Path) -> None:
     specYaml = """
 resources:

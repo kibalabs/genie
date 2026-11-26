@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ### Changed
 - [MAJOR] Request field `minValue` and `maxValue` reject values outside them with a 400 instead of clamping them, and only take numbers
 - [MINOR] `defaultAuthentication` and `authentication` policy names can contain underscores (e.g. `resource_owner`)
+- [MINOR] Transition `action` names can contain digits after the first character (e.g. `SYNC-V3-WALLETS`)
 - [PATCH] Generated `python-server` and `typescript-client` modules only import what they use (for example `datetime`, `collections.abc`, `uuid`, `resources` and kiba-core's `RawObject`), and the `typescript-client` index only re-exports `endpoints` when it has classes
 - [PATCH] `typescript-client` resources without attributes pass kibalabs lint (their `toObject` no longer trips `class-methods-use-this`)
 

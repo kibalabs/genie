@@ -359,6 +359,33 @@ transitions:
     assert calls == {'get_payment_link_v1': {'invoiceNo': 'inv-1'}}
 
 
+def test_action_names_can_contain_digits(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _generate(
+        specYaml="""
+transitions:
+  - action: SYNC-V3-WALLETS
+resources:
+  - singleName: Wallet
+    collectionName: Wallets
+    attributes:
+      - name: wallet-id
+        type: String
+        isPrimary: true
+    transitions:
+      - action: REFRESH-V2
+        operatesOn: individual
+""",
+        outputDirectory=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    calls: dict[str, dict[str, object]] = {}
+    client = _client(calls=calls, returnValues={})
+    assert client.post('/sync-v3-wallets', json={}).status_code == HTTPStatus.OK
+    assert client.post('/wallets/w1/refresh-v2', json={}).status_code == HTTPStatus.OK
+    assert calls == {'sync_v3_wallets_v1': {}, 'refresh_v2_wallet_v1': {'walletId': 'w1'}}
+    assert hasattr(_module('endpoints'), 'SyncV3WalletsRequest')
+
+
 def test_query_parameters_fields_receive_every_query_parameter(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _generate(
         specYaml="""
