@@ -146,6 +146,7 @@ class RenderableAttribute(RenderableField):
     isSettable: bool = False
     isAccessibleIndependently: bool = False
     shouldDisableGetEndpoint: bool = False
+    serializedName: str | None = None
 
 
 class RenderableResource(BaseModel):

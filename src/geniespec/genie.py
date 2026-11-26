@@ -243,6 +243,7 @@ class Renderer:
             isSettable=attribute.isSettable,
             isNullable=attribute.isNullable,
             description=attribute.description,
+            serializedName=attribute.serializedName,
             minValue=attribute.minValue,
             maxValue=attribute.maxValue,
             minLength=attribute.minLength,
@@ -501,6 +502,9 @@ class Renderer:
             if resource.transitions and resource.primaryAttribute is not None and not isOneToOne and resource.primaryAttribute.name != expectedPrimaryName:
                 resourceErrors.append(f'Primary attribute of {fullName} must be {expectedPrimaryName}, found {resource.primaryAttribute.name}')
             resourceErrors += [error for attribute in resource.attributes for error in self._constraint_errors(owner=fullName, field=attribute)]
+            resourceErrors += [f'{attribute.name} on {fullName} cannot have a serializedName because it is sent in requests (isPrimary, isUnique, isUniqueInParent, isSettable or isUpdatable)' for attribute in resource.attributes if attribute.serializedName is not None and (attribute.isPrimary or attribute.isUnique or attribute.isUniqueInParent or attribute.isSettable or attribute.isUpdatable)]
+            serializedNames = [attribute.serializedName or RenderableString.from_kebab_case_string(string=attribute.name).camelCaseString for attribute in resource.attributes]
+            resourceErrors += [f'Duplicate serialized name {name} on {fullName}' for name, count in collections.Counter(serializedNames).items() if count > 1]
             resourceErrors += [error for transition in resource.transitions for requestField in transition.requestFields for error in self._constraint_errors(owner=f'{fullName} {transition.action}', field=requestField)]
         resourceErrors += [error for transition in api.transitions for requestField in transition.requestFields for error in self._constraint_errors(owner=transition.action, field=requestField)]
         if resourceErrors:

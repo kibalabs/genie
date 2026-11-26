@@ -165,6 +165,9 @@ definitions:
         type: boolean
       description:
         type: string
+      serializedName:
+        type: string
+        pattern: '^[A-Za-z_$][A-Za-z0-9_$]*$'
       defaultValue:
         type:
           - string
