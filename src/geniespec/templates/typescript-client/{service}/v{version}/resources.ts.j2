@@ -5,6 +5,10 @@
 {% if coreImports %}
 import { {{ coreImports | join(', ') }} } from '@kibalabs/core';
 {% endif %}
+{% if target.requires_datetime_parsing(renderableTypes=target.resource_field_types(api=api)) %}
+
+{{ target.datetime_parser_declaration() }}
+{% endif %}
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 {% for enum in api.enums %}

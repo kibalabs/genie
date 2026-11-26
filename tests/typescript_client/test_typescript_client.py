@@ -143,7 +143,7 @@ console.log(JSON.stringify({
 """
 
 
-def _run_typescript(specYaml: str, script: str, directory: pathlib.Path) -> typing.Any:  # type: ignore[explicit-any]
+def _run_typescript(specYaml: str, script: str, directory: pathlib.Path, timezone: str = 'UTC') -> typing.Any:  # type: ignore[explicit-any]
     outputDirectory = directory / 'out'
     build(specPath=write_spec(specYaml=specYaml, directory=directory), target='typescript-client', outputDirectoryPath=outputDirectory)
     (outputDirectory / 'node_modules').symlink_to(TYPESCRIPT_TOOLS_DIRECTORY, target_is_directory=True)
@@ -154,7 +154,7 @@ def _run_typescript(specYaml: str, script: str, directory: pathlib.Path) -> typi
         [str(TYPESCRIPT_TOOLS_DIRECTORY / '.bin' / 'tsc'), '--noEmit', '--strict', '--skipLibCheck', '--target', 'ES2022', '--module', 'preserve', '--moduleResolution', 'bundler', str(scriptPath)], capture_output=True, text=True, check=False
     )
     assert typeCheck.returncode == 0, typeCheck.stdout
-    result = subprocess.run([str(TYPESCRIPT_TOOLS_DIRECTORY / '.bin' / 'tsx'), str(scriptPath)], capture_output=True, text=True, check=True, cwd=outputDirectory, env={**os.environ, 'TZ': 'UTC'})  # noqa: S603
+    result = subprocess.run([str(TYPESCRIPT_TOOLS_DIRECTORY / '.bin' / 'tsx'), str(scriptPath)], capture_output=True, text=True, check=True, cwd=outputDirectory, env={**os.environ, 'TZ': timezone})  # noqa: S603
     return json.loads(result.stdout)
 
 
@@ -427,6 +427,49 @@ console.log(JSON.stringify({ calls }));
 """
     output = _run_typescript(specYaml=specYaml, script=script, directory=tmp_path)
     assert output['calls'] == [{'method': 'post', 'url': 'https://api.test/v1/sync-v3-wallets'}]
+
+
+def test_typescript_client_reads_datetimes_without_an_offset_as_utc(tmp_path: pathlib.Path) -> None:
+    specYaml = """
+resources:
+  - singleName: Event
+    collectionName: Events
+    attributes:
+      - name: event-id
+        type: String
+        isPrimary: true
+      - name: started-date
+        type: Datetime
+      - name: day
+        type: Date
+    transitions:
+      - action: GET
+      - action: LAST-SEEN
+        operatesOn: individual
+        method: GET
+        responseField:
+          name: last-seen-date
+          type: Datetime
+"""
+    script = """
+import { Requester, RestMethod } from '@kibalabs/core';
+
+import { GenieTestApiV1Client } from './genie-test-api/v1';
+
+const requester = {
+  makeRequest: async (method: RestMethod, url: string): Promise<{ content: string }> => {
+    const content = url.endsWith('/last-seen') ? { lastSeenDate: '2024-01-02T03:04:05+01:00' } : { event: { eventId: 'e1', startedDate: '2024-01-02T03:04:05.123456', day: '2024-01-02' } };
+    return { content: JSON.stringify(content) };
+  },
+} as unknown as Requester;
+
+const client = new GenieTestApiV1Client(requester, 'https://api.test/v1');
+const event = await client.getEvent('e1');
+const lastSeenDate = await client.getLastSeenEvent('e1');
+console.log(JSON.stringify({ startedDate: event.startedDate.toISOString(), lastSeenDate: lastSeenDate.toISOString(), day: [event.day.getFullYear(), event.day.getMonth() + 1, event.day.getDate()] }));
+"""
+    output = _run_typescript(specYaml=specYaml, script=script, directory=tmp_path, timezone='America/New_York')
+    assert output == {'startedDate': '2024-01-02T03:04:05.123Z', 'lastSeenDate': '2024-01-02T02:04:05.000Z', 'day': [2024, 1, 2]}
 
 
 def test_typescript_client_rejects_names_reserved_in_typescript(tmp_path: pathlib.Path) -> None:
