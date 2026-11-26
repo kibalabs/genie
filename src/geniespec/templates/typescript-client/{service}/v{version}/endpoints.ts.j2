@@ -14,6 +14,10 @@ import { {{ coreImports | join(', ') }} } from '@kibalabs/core';
 
 import * as Resources from './resources';
 {% endif %}
+{% if target.requires_datetime_parsing(renderableTypes=responseTypes) %}
+
+{{ target.datetime_parser_declaration() }}
+{% endif %}
 {% for operation in target.client_operations(api=api) %}
 {% set className = target.operation_class_name(operation=operation) %}
 {% set bodyParameters = target.body_parameters(operation=operation) %}

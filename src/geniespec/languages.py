@@ -741,6 +741,14 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
     def requires_date_parsing(self, renderableTypes: list[RenderableType]) -> bool:
         return any(self._contains_raw_type(renderableType=renderableType, rawType=rawType) for renderableType in renderableTypes for rawType in (PrimitiveTypes.DATE, PrimitiveTypes.DATETIME))
 
+    def requires_datetime_parsing(self, renderableTypes: list[RenderableType]) -> bool:
+        return any(self._contains_raw_type(renderableType=renderableType, rawType=PrimitiveTypes.DATETIME) for renderableType in renderableTypes)
+
+    # NOTE(krishan711): servers send naive UTC datetimes without an offset, which kiba-core's dateFromString would read as local time
+    @staticmethod
+    def datetime_parser_declaration() -> str:
+        return 'const dateFromUtcString = (value: string): Date => dateFromString(/(Z|[+-]\\d{2}:?\\d{2})$/.test(value) ? value : `${value}Z`);'
+
     def resource_field_types(self, api: RenderableApi) -> list[RenderableType]:
         return [attribute.fieldType for resource in api.resources for attribute in resource.attributes]
 
@@ -798,7 +806,9 @@ class TypeScriptLanguageDefinition(BaseLanguageDefinition):
             return f'BigInt(String({value}))'
         if renderableType.rawType == PrimitiveTypes.BOOLEAN:
             return f'Boolean({value})'
-        if renderableType.rawType in (PrimitiveTypes.DATE, PrimitiveTypes.DATETIME):
+        if renderableType.rawType == PrimitiveTypes.DATETIME:
+            return f'dateFromUtcString(String({value}))'
+        if renderableType.rawType == PrimitiveTypes.DATE:
             return f'dateFromString(String({value}))'
         if renderableType.rawType == PrimitiveTypes.JSON:
             return f'{value} as {self.type(renderableType=renderableType, apiVersion=apiVersion, isLocalReference=isLocalReference)}'
