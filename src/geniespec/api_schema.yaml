@@ -165,7 +165,7 @@ definitions:
         type: boolean
       description:
         type: string
-      wireName:
+      serializedName:
         type: string
         pattern: '^[A-Za-z_$][A-Za-z0-9_$]*$'
       defaultValue:

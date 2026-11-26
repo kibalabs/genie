@@ -162,8 +162,8 @@ class BaseLanguageDefinition:
         return normalizedName.camelCaseString
 
     @classmethod
-    def json_name(cls, attribute: RenderableAttribute) -> str:
-        return attribute.wireName if attribute.wireName is not None else cls.identifier(name=attribute.name)
+    def serialized_name(cls, attribute: RenderableAttribute) -> str:
+        return attribute.serializedName if attribute.serializedName is not None else cls.identifier(name=attribute.name)
 
     @classmethod
     def pascal_name(cls, name: RenderableString) -> str:
@@ -470,11 +470,11 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
 
     def attribute_declaration(self, attribute: RenderableAttribute, apiVersion: Version) -> str:
         typeName = self._constrained_type(field=attribute, apiVersion=apiVersion, fieldFunction='pydantic.Field', isLocalReference=True)
-        return f'{typeName}{self._field_default(default=None, description=attribute.description, fieldFunction="pydantic.Field", alias=attribute.wireName)}'
+        return f'{typeName}{self._field_default(default=None, description=attribute.description, fieldFunction="pydantic.Field", alias=attribute.serializedName)}'
 
     @staticmethod
-    def resource_has_wire_names(resource: RenderableResource) -> bool:
-        return any(attribute.wireName is not None for attribute in resource.attributes)
+    def resource_has_serialized_names(resource: RenderableResource) -> bool:
+        return any(attribute.serializedName is not None for attribute in resource.attributes)
 
     @staticmethod
     def route_documentation_arguments(operation: RenderableOperation) -> str:
@@ -538,7 +538,7 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
         return len(api.enums) > 0 or len(api.oneOfs) > 0 or hasInlineEnums or hasConstraints or self.requires_big_int(api=api)
 
     def resources_require_pydantic(self, api: RenderableApi) -> bool:
-        hasFieldArguments = any(attribute.description is not None or attribute.wireName is not None or self._constraint_arguments(field=attribute) for resource in api.resources for attribute in resource.attributes)
+        hasFieldArguments = any(attribute.description is not None or attribute.serializedName is not None or self._constraint_arguments(field=attribute) for resource in api.resources for attribute in resource.attributes)
         return len(api.oneOfs) > 0 or hasFieldArguments or self.module_requires(api=api, module='resources', requirement='json') or self.requires_big_int(api=api)
 
     def one_of_alias(self, oneOf: RenderableOneOf, apiVersion: Version) -> str:

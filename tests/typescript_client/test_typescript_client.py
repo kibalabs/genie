@@ -429,7 +429,7 @@ console.log(JSON.stringify({ calls }));
     assert output['calls'] == [{'method': 'post', 'url': 'https://api.test/v1/sync-v3-wallets'}]
 
 
-def test_typescript_client_reads_and_writes_wire_names(tmp_path: pathlib.Path) -> None:
+def test_typescript_client_reads_and_writes_serialized_names(tmp_path: pathlib.Path) -> None:
     specYaml = """
 resources:
   - singleName: Transaction
@@ -437,7 +437,7 @@ resources:
     attributes:
       - name: from-address
         type: String
-        wireName: from
+        serializedName: from
       - name: to
         type: String
   - singleName: Payment

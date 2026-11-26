@@ -97,7 +97,7 @@ class Attribute(FieldConstraints):
     isAccessibleIndependently: bool = False
     defaultValue: str | int | float | bool | None = None
     description: str | None = None
-    wireName: str | None = None
+    serializedName: str | None = None
 
 
 class ResponseField(BaseModel):

@@ -360,7 +360,7 @@ transitions:
     assert calls == {'get_payment_link_v1': {'invoiceNo': 'inv-1'}}
 
 
-def test_wire_names_rename_attributes_in_json_but_not_in_code(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_serialized_names_rename_attributes_in_json_but_not_in_code(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _generate(
         specYaml="""
 resources:
@@ -369,7 +369,7 @@ resources:
     attributes:
       - name: from-address
         type: String
-        wireName: from
+        serializedName: from
       - name: to
         type: String
   - singleName: Payment
@@ -1977,20 +1977,20 @@ resources:
       - name: wallet-id
         type: String
         isPrimary: true
-        wireName: id
+        serializedName: id
       - name: owner-address
         type: String
-        wireName: to
+        serializedName: to
       - name: to
         type: String
     transitions:
       - action: GET
 """,
             [
-                'wallet-id on Wallet cannot have a wireName because it is sent in requests',
-                'Duplicate JSON name to on Wallet',
+                'wallet-id on Wallet cannot have a serializedName because it is sent in requests',
+                'Duplicate serialized name to on Wallet',
             ],
-            id='misused-wire-names',
+            id='misused-serialized-names',
         ),
     ],
 )

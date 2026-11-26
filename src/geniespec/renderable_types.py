@@ -146,7 +146,7 @@ class RenderableAttribute(RenderableField):
     isSettable: bool = False
     isAccessibleIndependently: bool = False
     shouldDisableGetEndpoint: bool = False
-    wireName: str | None = None
+    serializedName: str | None = None
 
 
 class RenderableResource(BaseModel):
