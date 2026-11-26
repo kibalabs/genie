@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Removed
+
+## [0.1.2] - 2026-11-26
+
+### Added
 - [MINOR] Added rate limits: a top-level `rateLimits` list (`name`, any of `perMinute`, `perFiveMinutes`, `perHour` and `perDay`, and `keyBy: user | ip`), a `defaultRateLimit`, and `rateLimit` on transitions (`none` turns the default off). Transitions using a user-keyed limit must have authentication. `python-server` writes each one as a `RATE_LIMIT_<NAME>` `RateLimitConfig` and passes it to kiba-core's `route`, which rejects requests over the limit with a 429
 - [MINOR] Added `serializedName` on attributes: the key the attribute uses in JSON when it differs from its name in code (e.g. `from`, which isn't a valid identifier). `python-server` writes it as a pydantic `alias` (resources serialize by alias); `typescript-client` reads and writes that key. Not allowed on attributes sent as request parameters
 - [MINOR] Added rate limit `exemption`s: a rate limit that names one is skipped for requests the app's `RateLimitExemptionResolver` says are exempt. `python-server` adds it to the `RateLimitConfig` and passes a keyword-only `rateLimitExemptionResolver` from `create_routes` to kiba-core's `route` (needs kiba-core with rate limit exemptions)
