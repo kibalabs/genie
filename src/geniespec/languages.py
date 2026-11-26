@@ -394,6 +394,15 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
     def route_rate_limit(operation: RenderableOperation) -> str | None:
         return operation.rateLimit if operation.rateLimit not in (None, 'none') else None
 
+    @classmethod
+    def route_rate_limit_has_exemption(cls, api: RenderableApi, operation: RenderableOperation) -> bool:
+        rateLimitName = cls.route_rate_limit(operation=operation)
+        return any(rateLimit.name.kebabCaseString == rateLimitName and rateLimit.exemption is not None for rateLimit in api.rateLimits)
+
+    @classmethod
+    def requires_rate_limit_exemption_resolver(cls, api: RenderableApi) -> bool:
+        return any(cls.route_rate_limit_has_exemption(api=api, operation=operation) for operation in api.operations)
+
     @staticmethod
     def rate_limit_constant_name(name: str) -> str:
         return f'RATE_LIMIT_{RenderableString.from_kebab_case_string(string=name).snakeCaseString.upper()}'
@@ -402,7 +411,8 @@ class PythonLanguageDefinition(BaseLanguageDefinition):
     def rate_limit_config(rateLimit: RenderableRateLimit) -> str:
         windows = {'perMinute': rateLimit.perMinute, 'perFiveMinutes': rateLimit.perFiveMinutes, 'perHour': rateLimit.perHour, 'perDay': rateLimit.perDay}
         entries = [f"'{window}': {limit}" for window, limit in windows.items() if limit is not None]
-        return '{' + ', '.join([*entries, f"'keyBy': '{rateLimit.keyBy}'"]) + '}'
+        exemption = [f"'exemption': '{rateLimit.exemption}'"] if rateLimit.exemption is not None else []
+        return '{' + ', '.join([*entries, f"'keyBy': '{rateLimit.keyBy}'", *exemption]) + '}'
 
     def operation_name(self, operation: RenderableOperation) -> str:
         return self.snake_name(name=self._operation_name(operation=operation))

@@ -67,7 +67,7 @@ class _AuthResolver:
         return []
 
 
-def _routes(calls: dict[str, dict[str, object]], returnValues: dict[str, object], authResolver: _AuthResolver | None = None) -> list[BaseRoute]:
+def _routes(calls: dict[str, dict[str, object]], returnValues: dict[str, object], authResolver: _AuthResolver | None = None, rateLimitExemptionResolver: object | None = None) -> list[BaseRoute]:
     internalClass = _module('internal').GenieTestApiV1Internal
 
     def implementation(methodName: str) -> object:
@@ -87,7 +87,8 @@ def _routes(calls: dict[str, dict[str, object]], returnValues: dict[str, object]
         return method
 
     internal = type('FakeInternal', (internalClass,), {name: implementation(methodName=name) for name in internalClass.__abstractmethods__})()
-    return typing.cast(list[BaseRoute], _module('api').create_routes(internal=internal, authResolver=authResolver or _AuthResolver()))
+    extraArguments = {'rateLimitExemptionResolver': rateLimitExemptionResolver} if rateLimitExemptionResolver is not None else {}
+    return typing.cast(list[BaseRoute], _module('api').create_routes(internal=internal, authResolver=authResolver or _AuthResolver(), **extraArguments))
 
 
 def _client(calls: dict[str, dict[str, object]], returnValues: dict[str, object], authResolver: _AuthResolver | None = None) -> TestClient:
@@ -1026,6 +1027,43 @@ transitions:
         return 5
 
     assert (allowed_calls('/limited-by-default'), allowed_calls('/limited-by-override'), allowed_calls('/not-limited')) == (2, 3, 5)
+    assert 'rateLimitExemptionResolver' not in inspect.signature(_module('api').create_routes).parameters
+
+
+class _ApiKeyExemptionResolver:
+    async def is_rate_limit_exempt(self, *, exemption: str, request: KibaApiRequest[pydantic.BaseModel]) -> bool:
+        return exemption == 'partner' and request.headers.get('x-api-key') is not None
+
+
+def test_rate_limit_exemptions_skip_the_limit_for_requests_the_resolver_exempts(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _generate(
+        specYaml="""
+rateLimits:
+  - name: sign-up
+    perMinute: 1
+    keyBy: ip
+    exemption: partner
+  - name: other
+    perMinute: 1
+    keyBy: ip
+transitions:
+  - action: SIGN-UP
+    rateLimit: sign-up
+  - action: OTHER
+    rateLimit: other
+""",
+        outputDirectory=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    client = TestClient(OriginIpMiddleware(app=Starlette(routes=_routes(calls={}, returnValues={}, rateLimitExemptionResolver=_ApiKeyExemptionResolver()))))
+    partnerHeaders = {'x-api-key': 'key'}
+    assert [client.post('/sign-up', json={}, headers=partnerHeaders).status_code for _ in range(3)] == [HTTPStatus.OK] * 3
+    assert client.post('/sign-up', json={}).status_code == HTTPStatus.OK
+    with pytest.raises(TooManyRequestsException):
+        client.post('/sign-up', json={})
+    assert client.post('/other', json={}, headers=partnerHeaders).status_code == HTTPStatus.OK
+    with pytest.raises(TooManyRequestsException):
+        client.post('/other', json={}, headers=partnerHeaders)
 
 
 def test_big_int_fields_are_ints_in_code_and_strings_in_json(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:

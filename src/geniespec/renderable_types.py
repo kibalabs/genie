@@ -271,6 +271,7 @@ class RenderableRateLimit(BaseModel):
     perHour: int | None
     perDay: int | None
     keyBy: str
+    exemption: str | None
 
 
 class RenderableApi(BaseModel):

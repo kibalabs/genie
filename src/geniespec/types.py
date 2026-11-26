@@ -44,6 +44,7 @@ class ApiRateLimit(BaseModel):
     perHour: int | None = None
     perDay: int | None = None
     keyBy: str = RateLimitKeys.USER
+    exemption: str | None = None
 
 
 class ComplexTypes:
