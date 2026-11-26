@@ -125,6 +125,17 @@ requestFields:
 
 `python-server` writes them as pydantic constraints (`typing.Annotated[int, Field(ge=1, le=2147483647)]`), so they also show up in the OpenAPI schema.
 
+## Wire names
+
+An attribute can set `wireName` to use a different key in JSON than in code, for names that can't be identifiers, like `from` in an Ethereum transaction (`{from, to, data, value}`):
+
+```yaml
+attributes:
+  - {name: from-address, type: String, wireName: from}
+```
+
+The code uses `fromAddress` and the JSON uses `from`, in responses, in the OpenAPI schema and when the resource is nested in a request. `python-server` writes it as a pydantic `alias`; `typescript-client` reads and writes the key in `fromObject` and `toObject`. Attributes that are sent as request parameters (`isPrimary`, `isUnique`, `isUniqueInParent`, `isSettable` or `isUpdatable`) can't set one yet.
+
 ## Overrides
 
 `overrides` keep an API that existed before genie working the same way once it moves to genie. They are meant to be dropped in the next major version of that API.

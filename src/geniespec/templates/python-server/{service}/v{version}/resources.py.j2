@@ -37,6 +37,10 @@ class {{ target.resource_class_name(resource=resource, apiVersion=api.version) }
 {% if resource.attributes|length == 0 %}
     pass
 {% endif %}
+{% if target.resource_has_wire_names(resource=resource) %}
+    model_config = pydantic.ConfigDict(serialize_by_alias=True, validate_by_name=True, validate_by_alias=True)
+
+{% endif %}
 {% for attribute in resource.attributes %}
     {{ target.identifier(name=attribute.name) }}: {{ target.attribute_declaration(attribute=attribute, apiVersion=api.version) }}
 {% endfor %}

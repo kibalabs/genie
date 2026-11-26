@@ -360,6 +360,47 @@ transitions:
     assert calls == {'get_payment_link_v1': {'invoiceNo': 'inv-1'}}
 
 
+def test_wire_names_rename_attributes_in_json_but_not_in_code(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _generate(
+        specYaml="""
+resources:
+  - singleName: Transaction
+    collectionName: Transactions
+    attributes:
+      - name: from-address
+        type: String
+        wireName: from
+      - name: to
+        type: String
+  - singleName: Payment
+    collectionName: Payments
+    attributes:
+      - name: payment-id
+        type: String
+        isPrimary: true
+    transitions:
+      - action: PREPARE
+        operatesOn: individual
+        requestFields:
+          - name: draft
+            type: Transaction
+            isRequired: true
+        responseField:
+          name: transaction
+          type: Transaction
+""",
+        outputDirectory=tmp_path,
+        monkeypatch=monkeypatch,
+    )
+    transactionClass = _module('resources').TransactionV1
+    calls: dict[str, dict[str, object]] = {}
+    client = _client(calls=calls, returnValues={'prepare_payment_v1': transactionClass(fromAddress='0xc', to='0xd')})
+    response = client.post('/payments/p1/prepare', json={'draft': {'from': '0xa', 'to': '0xb'}})
+    assert response.json() == {'transaction': {'from': '0xc', 'to': '0xd'}}
+    assert calls == {'prepare_payment_v1': {'paymentId': 'p1', 'draft': transactionClass(fromAddress='0xa', to='0xb')}}
+    assert set(transactionClass.model_json_schema(by_alias=True)['properties']) == {'from', 'to'}
+
+
 def test_action_names_can_contain_digits(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _generate(
         specYaml="""
@@ -1926,6 +1967,30 @@ transitions:
                 'tags on SEARCH: minLength is greater than maxLength',
             ],
             id='misused-constraints',
+        ),
+        pytest.param(
+            """
+resources:
+  - singleName: Wallet
+    collectionName: Wallets
+    attributes:
+      - name: wallet-id
+        type: String
+        isPrimary: true
+        wireName: id
+      - name: owner-address
+        type: String
+        wireName: to
+      - name: to
+        type: String
+    transitions:
+      - action: GET
+""",
+            [
+                'wallet-id on Wallet cannot have a wireName because it is sent in requests',
+                'Duplicate JSON name to on Wallet',
+            ],
+            id='misused-wire-names',
         ),
     ],
 )

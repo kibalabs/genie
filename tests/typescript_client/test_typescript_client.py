@@ -429,6 +429,54 @@ console.log(JSON.stringify({ calls }));
     assert output['calls'] == [{'method': 'post', 'url': 'https://api.test/v1/sync-v3-wallets'}]
 
 
+def test_typescript_client_reads_and_writes_wire_names(tmp_path: pathlib.Path) -> None:
+    specYaml = """
+resources:
+  - singleName: Transaction
+    collectionName: Transactions
+    attributes:
+      - name: from-address
+        type: String
+        wireName: from
+      - name: to
+        type: String
+  - singleName: Payment
+    collectionName: Payments
+    attributes:
+      - name: payment-id
+        type: String
+        isPrimary: true
+    transitions:
+      - action: PREPARE
+        operatesOn: individual
+        requestFields:
+          - name: draft
+            type: Transaction
+            isRequired: true
+        responseField:
+          name: transaction
+          type: Transaction
+"""
+    script = """
+import { Requester, RestMethod } from '@kibalabs/core';
+
+import { GenieTestApiV1Client, TransactionV1 } from './genie-test-api/v1';
+
+const calls: Record<string, unknown>[] = [];
+const requester = {
+  makeRequest: async (method: RestMethod, url: string, data?: Record<string, unknown>): Promise<{ content: string }> => {
+    calls.push({ method, url, data: JSON.parse(JSON.stringify(data ?? null)) });
+    return { content: JSON.stringify({ transaction: { from: '0xc', to: '0xd' } }) };
+  },
+} as unknown as Requester;
+
+const transaction = await new GenieTestApiV1Client(requester, 'https://api.test/v1').preparePayment('p1', { draft: new TransactionV1('0xa', '0xb') });
+console.log(JSON.stringify({ calls, fromAddress: transaction.fromAddress, to: transaction.to }));
+"""
+    output = _run_typescript(specYaml=specYaml, script=script, directory=tmp_path)
+    assert output == {'calls': [{'method': 'post', 'url': 'https://api.test/v1/payments/p1/prepare', 'data': {'draft': {'from': '0xa', 'to': '0xb'}}}], 'fromAddress': '0xc', 'to': '0xd'}
+
+
 def test_typescript_client_reads_datetimes_without_an_offset_as_utc(tmp_path: pathlib.Path) -> None:
     specYaml = """
 resources:
